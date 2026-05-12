@@ -599,6 +599,39 @@ async function buildAll() {
       `${BASE_URL}/providers/${token}_foreign.yaml`
     );
     
+    // --- ПОЛЬЗОВАТЕЛЬСКИЕ ПЕРЕОПРЕДЕЛЕНИЯ (custom.yaml) ---
+    const customPath = path.join(userDir, 'custom.yaml');
+    if (fs.existsSync(customPath)) {
+      try {
+        const customConfig = yaml.load(fs.readFileSync(customPath, 'utf8'));
+        if (customConfig && typeof customConfig === 'object') {
+          for (const key of Object.keys(customConfig)) {
+            if (key === 'proxy-groups' && Array.isArray(customConfig[key])) {
+              // Сливаем группы прокси по имени
+              for (const cg of customConfig[key]) {
+                const existingGroup = masterConfig['proxy-groups'].find(g => g.name === cg.name);
+                if (existingGroup) {
+                  Object.assign(existingGroup, cg);
+                } else {
+                  masterConfig['proxy-groups'].push(cg);
+                }
+              }
+            } else if (key === 'rules' && Array.isArray(customConfig[key])) {
+              // Добавляем кастомные правила в САМОЕ НАЧАЛО
+              masterConfig.rules = [...customConfig[key], ...masterConfig.rules];
+            } else {
+              // Перезаписываем или добавляем другие ключи (external-ui, secret и т.д.)
+              masterConfig[key] = customConfig[key];
+            }
+          }
+          console.log(`[Info] Merged custom.yaml for user ${user}`);
+        }
+      } catch (e) {
+        console.error(`[Error] Failed to parse custom.yaml for user ${user}:`, e.message);
+      }
+    }
+    // ------------------------------------------------------
+    
     fs.writeFileSync(configPath, yaml.dump(masterConfig, { indent: 2, lineWidth: -1 }));
     console.log(`[Success] Generated configs for user: ${user}`);
     console.log(`  -> Subscription Link: ${BASE_URL}/configs/${token}.yaml`);
