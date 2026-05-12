@@ -1,0 +1,31 @@
+# Caddyfile for Mihomo Subscription Manager
+
+# Your domain (e.g., sub.k3k.lol)
+# NOTE: When your domain expires on June 10th, you can change this to your new domain.
+# If you decide to use an IP instead, replace this with your IP (e.g., http://1.2.3.4), 
+# but remember that HTTP traffic is unencrypted!
+sub.k3k.lol {
+    # Path to the public directory where build.js outputs configs and providers
+    root * /opt/mihomo-subscriptions/public
+
+    # Enable static file server
+    file_server
+
+    # Set headers to allow Mihomo clients to fetch configs without cache issues
+    header {
+        Access-Control-Allow-Origin *
+        Cache-Control "no-cache, no-store, must-revalidate"
+        Content-Type "text/yaml; charset=utf-8"
+        # Optional: Hide server info
+        -Server
+    }
+
+    # Optional: Basic Authentication for the whole site
+    # If you want to secure the root so random people can't guess URLs:
+    # basicauth /* {
+    #     username Jashdg2387asdh # Use `caddy hash-password` to generate the password hash
+    # }
+
+    # Enable gzip/zstd compression
+    encode zstd gzip
+}
