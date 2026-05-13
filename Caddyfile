@@ -6,18 +6,24 @@
 # but remember that HTTP traffic is unencrypted!
 sub.k3k.lol {
     # Path to the public directory where build.js outputs configs and providers
-    root * /opt/mihomo-subscriptions/public
+    root * /opt/subscription-manager/public
 
     # Enable static file server
     file_server
 
-    # Set headers to allow Mihomo clients to fetch configs without cache issues
+    # Set basic headers for all yaml files
     header {
         Access-Control-Allow-Origin *
         Cache-Control "no-cache, no-store, must-revalidate"
         Content-Type "text/yaml; charset=utf-8"
-        # Optional: Hide server info
         -Server
+    }
+
+    # Set specific headers for master configs (Subscription info, Update interval, Filename)
+    header /configs/* {
+        Content-Disposition "attachment; filename=\"k3k.lol VPN\""
+        Subscription-Userinfo "upload=0; download=0; total=1099511627776; expire=1893456000"
+        Profile-Update-Interval "24"
     }
 
     # Optional: Basic Authentication for the whole site

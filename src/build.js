@@ -599,6 +599,9 @@ async function buildAll() {
       `${BASE_URL}/providers/${token}_foreign.yaml`
     );
     
+    // Вшиваем имя профиля прямо в YAML (поддерживается многими клиентами)
+    masterConfig['profile-name'] = 'k3k.lol VPN';
+    
     // --- ПОЛЬЗОВАТЕЛЬСКИЕ ПЕРЕОПРЕДЕЛЕНИЯ (custom.yaml) ---
     const customPath = path.join(userDir, 'custom.yaml');
     if (fs.existsSync(customPath)) {
