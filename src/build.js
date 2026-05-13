@@ -301,7 +301,7 @@ function generateConfig(userName, ruProviderUrl, foreignProviderUrl) {
       {
         name: '🚫 Заблокированные сайты (RU)',
         type: 'select',
-        proxies: ['REJECT', 'DIRECT', '🌍 Иностранные серверы', '🇷🇺 Российские серверы'],
+        proxies: ['🌍 Иностранные серверы', '🇷🇺 Российские серверы', 'DIRECT', 'REJECT'],
         use: ['foreign_servers', 'ru_servers']
       },
       {
@@ -529,23 +529,23 @@ async function buildAll() {
       for (const f of files) {
         const content = fs.readFileSync(path.join(ruDir, f), 'utf-8');
         const lines = content.split('\n');
+        let validProxies = [];
+        
         for (let i = 0; i < lines.length; i++) {
           const proxy = await parseProxy(lines[i]);
-          if (proxy) {
-            if (!proxy.name || proxy.name.includes('awg-')) {
-               proxy.name = `${f.replace(/\.[^/.]+$/, "")}${lines.length > 2 ? `-${i}` : ''}`;
-            }
-            ruProxies.push(proxy);
-          }
+          if (proxy) validProxies.push(proxy);
         }
         
-        if (content.includes('[Interface]')) {
+        if (content.includes('[Interface]') || content.trim().startsWith('{')) {
            const proxy = await parseProxy(content);
-           if (proxy) {
-             proxy.name = f.replace(/\.[^/.]+$/, "");
-             ruProxies.push(proxy);
-           }
+           if (proxy) validProxies.push(proxy);
         }
+        
+        const baseName = f.replace(/\.[^/.]+$/, "");
+        validProxies.forEach((p, idx) => {
+           p.name = validProxies.length === 1 ? baseName : `${baseName}-${idx + 1}`;
+           ruProxies.push(p);
+        });
       }
     }
     
@@ -555,23 +555,23 @@ async function buildAll() {
       for (const f of files) {
         const content = fs.readFileSync(path.join(foreignDir, f), 'utf-8');
         const lines = content.split('\n');
+        let validProxies = [];
+        
         for (let i = 0; i < lines.length; i++) {
           const proxy = await parseProxy(lines[i]);
-          if (proxy) {
-            if (!proxy.name || proxy.name.includes('awg-')) {
-               proxy.name = `${f.replace(/\.[^/.]+$/, "")}${lines.length > 2 ? `-${i}` : ''}`;
-            }
-            foreignProxies.push(proxy);
-          }
+          if (proxy) validProxies.push(proxy);
         }
         
-        if (content.includes('[Interface]')) {
+        if (content.includes('[Interface]') || content.trim().startsWith('{')) {
            const proxy = await parseProxy(content);
-           if (proxy) {
-             proxy.name = f.replace(/\.[^/.]+$/, "");
-             foreignProxies.push(proxy);
-           }
+           if (proxy) validProxies.push(proxy);
         }
+        
+        const baseName = f.replace(/\.[^/.]+$/, "");
+        validProxies.forEach((p, idx) => {
+           p.name = validProxies.length === 1 ? baseName : `${baseName}-${idx + 1}`;
+           foreignProxies.push(p);
+        });
       }
     }
     
