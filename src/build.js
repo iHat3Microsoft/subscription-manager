@@ -173,7 +173,7 @@ function generateConfig(userName, ruProviderUrl, foreignProviderUrl) {
         'health-check': {
           enable: true,
           interval: 600,
-          url: 'http://www.gstatic.com/generate_204'
+          url: 'https://www.gstatic.com/generate_204'
         }
       },
       foreign_servers: {
@@ -184,7 +184,7 @@ function generateConfig(userName, ruProviderUrl, foreignProviderUrl) {
         'health-check': {
           enable: true,
           interval: 600,
-          url: 'http://www.gstatic.com/generate_204'
+          url: 'https://www.gstatic.com/generate_204'
         }
       }
     },
@@ -194,7 +194,7 @@ function generateConfig(userName, ruProviderUrl, foreignProviderUrl) {
         name: '♻️ Автовыбор (Иностранные)',
         type: 'fallback',
         hidden: true,
-        url: 'https://cp.cloudflare.com/generate_204',
+        url: 'https://www.gstatic.com/generate_204',
         interval: 300,
         timeout: 5000,
         lazy: true,
@@ -210,7 +210,7 @@ function generateConfig(userName, ruProviderUrl, foreignProviderUrl) {
         name: '♻️ Автовыбор (Россия)',
         type: 'fallback',
         hidden: true,
-        url: 'https://cp.cloudflare.com/generate_204',
+        url: 'https://www.gstatic.com/generate_204',
         interval: 300,
         timeout: 5000,
         lazy: true,
@@ -226,7 +226,7 @@ function generateConfig(userName, ruProviderUrl, foreignProviderUrl) {
         name: '♻️ Резерв (RU -> EU)',
         type: 'fallback',
         hidden: true,
-        url: 'https://cp.cloudflare.com/generate_204',
+        url: 'https://www.gstatic.com/generate_204',
         interval: 300,
         timeout: 5000,
         lazy: true,
@@ -301,7 +301,7 @@ function generateConfig(userName, ruProviderUrl, foreignProviderUrl) {
       {
         name: '🚫 Заблокированные сайты (RU)',
         type: 'select',
-        proxies: ['🌍 Иностранные серверы', '🇷🇺 Российские серверы', 'DIRECT', 'REJECT'],
+        proxies: ['🌍 Иностранные серверы', '🇷🇺 Российские серверы', 'DIRECT'],
         use: ['foreign_servers', 'ru_servers']
       },
       {
@@ -400,6 +400,22 @@ function generateConfig(userName, ruProviderUrl, foreignProviderUrl) {
         path: './rule-sets/roblox.yaml',
         interval: 86400
       },
+      'discord-ips': {
+        behavior: 'ipcidr',
+        type: 'http',
+        format: 'mrs',
+        url: 'https://github.com/MetaCubeX/meta-rules-dat/raw/meta/geo/geoip/discord.mrs',
+        path: './rule-sets/discord-ips.mrs',
+        interval: 86400
+      },
+      'geosite-soundcloud': {
+        behavior: 'domain',
+        type: 'http',
+        format: 'mrs',
+        url: 'https://github.com/MetaCubeX/meta-rules-dat/raw/meta/geo/geosite/soundcloud.mrs',
+        path: './rule-sets/soundcloud.mrs',
+        interval: 86400
+      },
       'telegram-domains': {
         behavior: 'domain',
         type: 'http',
@@ -473,11 +489,12 @@ function generateConfig(userName, ruProviderUrl, foreignProviderUrl) {
       'IP-CIDR,10.0.0.0/8,DIRECT,no-resolve',
       'IP-CIDR,172.16.0.0/12,DIRECT,no-resolve',
       'RULE-SET,geosite-youtube,▶️ YouTube',
-      'OR,((RULE-SET,geosite-discord),(RULE-SET,discord_voiceips),(PROCESS-NAME,Discord.exe)),💬 Discord',
+      'OR,((RULE-SET,geosite-discord),(RULE-SET,discord-ips),(PROCESS-NAME,Discord.exe)),💬 Discord',
       'RULE-SET,geosite-instagram,📸 Instagram & Threads',
       'RULE-SET,geosite-facebook,👥 Facebook',
-      'OR,((RULE-SET,telegram-ips),(RULE-SET,telegram-domains),(IP-ASN,59930),(DOMAIN,firebaselogging.googleapis.com),(DOMAIN,dns.google.com),(PROCESS-NAME,org.telegram.messenger),(PROCESS-NAME,org.telegram.messenger.web),(PROCESS-NAME,org.telegram.plus),(PROCESS-NAME,org.thunderdog.challegram),(PROCESS-NAME,Telegram.exe),(PROCESS-NAME,Telegram)),➤ Telegram',
+      'OR,((RULE-SET,telegram-ips),(RULE-SET,telegram-domains),(IP-ASN,59930),(PROCESS-NAME,org.telegram.messenger),(PROCESS-NAME,org.telegram.messenger.web),(PROCESS-NAME,org.telegram.plus),(PROCESS-NAME,org.thunderdog.challegram),(PROCESS-NAME,Telegram.exe),(PROCESS-NAME,Telegram)),➤ Telegram',
       'RULE-SET,geosite-tiktok,🎵 TikTok',
+      'RULE-SET,geosite-soundcloud,🌍 Иностранные серверы',
       'OR,((RULE-SET,geosite-openai),(RULE-SET,google-gemini),(RULE-SET,geosite-anthropic),(DOMAIN-KEYWORD,grok),(DOMAIN-SUFFIX,grok.com),(DOMAIN-SUFFIX,appcenter.ms),(DOMAIN-KEYWORD,copilot),(DOMAIN-SUFFIX,copilot.microsoft.com)),🤖 AI (Нейронки)',
       'RULE-SET,geosite-supercell,👾 Brawl Stars',
       'RULE-SET,geosite-roblox,🎮 Roblox',
@@ -525,7 +542,7 @@ async function buildAll() {
     
     // Parse RU servers
     if (fs.existsSync(ruDir)) {
-      const files = fs.readdirSync(ruDir);
+      const files = fs.readdirSync(ruDir).sort();
       for (const f of files) {
         const content = fs.readFileSync(path.join(ruDir, f), 'utf-8');
         const lines = content.split('\n');
@@ -551,7 +568,7 @@ async function buildAll() {
     
     // Parse Foreign servers
     if (fs.existsSync(foreignDir)) {
-      const files = fs.readdirSync(foreignDir);
+      const files = fs.readdirSync(foreignDir).sort();
       for (const f of files) {
         const content = fs.readFileSync(path.join(foreignDir, f), 'utf-8');
         const lines = content.split('\n');
@@ -586,7 +603,7 @@ async function buildAll() {
     
     const ruPath = path.join(PROVIDERS_DIR, `${token}_ru.yaml`);
     const foreignPath = path.join(PROVIDERS_DIR, `${token}_foreign.yaml`);
-    const configPath = path.join(CONFIGS_DIR, `${token}.yaml`);
+    const configPath = path.join(CONFIGS_DIR, `${token}`);
     
     // Write Providers
     fs.writeFileSync(ruPath, yaml.dump({ proxies: ruProxies }, { indent: 2, lineWidth: -1 }));
@@ -637,7 +654,7 @@ async function buildAll() {
     
     fs.writeFileSync(configPath, yaml.dump(masterConfig, { indent: 2, lineWidth: -1 }));
     console.log(`[Success] Generated configs for user: ${user}`);
-    console.log(`  -> Subscription Link: ${BASE_URL}/configs/${token}.yaml`);
+    console.log(`  -> Subscription Link: ${BASE_URL}/configs/${token}`);
   }
 }
 
