@@ -201,12 +201,6 @@ function generateConfig(userName, ruProviderUrl, foreignProviderUrl) {
         use: ['foreign_servers']
       },
       {
-        name: '🌍 Иностранные серверы',
-        type: 'select',
-        proxies: ['♻️ Автовыбор (Иностранные)'],
-        use: ['foreign_servers']
-      },
-      {
         name: '♻️ Автовыбор (Россия)',
         type: 'fallback',
         hidden: true,
@@ -214,12 +208,6 @@ function generateConfig(userName, ruProviderUrl, foreignProviderUrl) {
         interval: 300,
         timeout: 5000,
         lazy: true,
-        use: ['ru_servers']
-      },
-      {
-        name: '🇷🇺 Российские серверы',
-        type: 'select',
-        proxies: ['♻️ Автовыбор (Россия)'],
         use: ['ru_servers']
       },
       {
@@ -233,74 +221,16 @@ function generateConfig(userName, ruProviderUrl, foreignProviderUrl) {
         use: ['ru_servers', 'foreign_servers']
       },
       {
-        name: '▶️ YouTube',
+        name: '🌍 Иностранные серверы',
         type: 'select',
-        proxies: ['♻️ Резерв (RU -> EU)', '🇷🇺 Российские серверы', '🌍 Иностранные серверы'],
-        use: ['ru_servers', 'foreign_servers']
-      },
-      {
-        name: '💬 Discord',
-        type: 'select',
-        proxies: ['♻️ Резерв (RU -> EU)', '🇷🇺 Российские серверы', '🌍 Иностранные серверы'],
-        use: ['ru_servers', 'foreign_servers']
-      },
-      {
-        name: '📸 Instagram & Threads',
-        type: 'select',
-        proxies: ['🌍 Иностранные серверы', '🇷🇺 Российские серверы'],
-        use: ['foreign_servers', 'ru_servers']
-      },
-      {
-        name: '👥 Facebook',
-        type: 'select',
-        proxies: ['🌍 Иностранные серверы', '🇷🇺 Российские серверы'],
-        use: ['foreign_servers', 'ru_servers']
-      },
-      {
-        name: '➤ Telegram',
-        type: 'select',
-        proxies: ['🌍 Иностранные серверы', '🇷🇺 Российские серверы'],
-        use: ['foreign_servers', 'ru_servers']
-      },
-      {
-        name: '🎵 TikTok',
-        type: 'select',
-        proxies: ['🌍 Иностранные серверы', '🇷🇺 Российские серверы'],
-        use: ['foreign_servers', 'ru_servers']
-      },
-      {
-        name: '🤖 AI (Нейронки)',
-        type: 'select',
-        proxies: ['🌍 Иностранные серверы', '🇷🇺 Российские серверы'],
-        use: ['foreign_servers', 'ru_servers']
-      },
-      {
-        name: '👾 Brawl Stars',
-        type: 'select',
-        proxies: ['🌍 Иностранные серверы', '🇷🇺 Российские серверы'],
-        use: ['foreign_servers', 'ru_servers']
-      },
-      {
-        name: '🎮 Roblox',
-        type: 'select',
-        proxies: ['🌍 Иностранные серверы', '🇷🇺 Российские серверы'],
-        use: ['foreign_servers', 'ru_servers']
-      },
-      {
-        name: '🌐 Остальной трафик (MATCH)',
-        type: 'select',
-        proxies: ['DIRECT', '🌍 Иностранные серверы', '🇷🇺 Российские серверы'],
-        use: ['foreign_servers', 'ru_servers']
-      },
-      {
-        name: '🚫 Реклама',
-        type: 'select',
-        proxies: ['REJECT', 'DIRECT', '🌍 Иностранные серверы', '🇷🇺 Российские серверы'],
-        use: ['foreign_servers', 'ru_servers']
+        icon: 'https://cdn.jsdelivr.net/gh/Koolson/Qure@master/IconSet/Color/Global.png',
+        proxies: ['♻️ Автовыбор (Иностранные)'],
+        use: ['foreign_servers']
       },
       {
         name: '🚫 Заблокированные сайты (RU)',
         type: 'select',
+        icon: 'https://raw.githubusercontent.com/remnawave/templates/refs/heads/main/icons/Blocked.png',
         proxies: ['🌍 Иностранные серверы', '🇷🇺 Российские серверы', 'DIRECT'],
         use: ['foreign_servers', 'ru_servers']
       },
@@ -308,12 +238,113 @@ function generateConfig(userName, ruProviderUrl, foreignProviderUrl) {
         name: '🔞 18+',
         type: 'select',
         hidden: true,
+        icon: 'https://cdn.jsdelivr.net/gh/Koolson/Qure@master/IconSet/Color/Pornhub.png',
         proxies: ['🌍 Иностранные серверы', '🇷🇺 Российские серверы', 'DIRECT'],
+        use: ['foreign_servers', 'ru_servers']
+      },
+      {
+        name: '🚫 Реклама',
+        type: 'select',
+        icon: 'https://raw.githubusercontent.com/remnawave/templates/refs/heads/main/icons/AdBlock.png',
+        proxies: ['REJECT', 'DIRECT'],
+        use: []
+      },
+      {
+        name: '🌐 Остальной трафик (MATCH)',
+        type: 'select',
+        icon: 'https://cdn.jsdelivr.net/gh/Koolson/Qure@master/IconSet/Color/Auto.png',
+        proxies: ['🌍 Иностранные серверы', 'DIRECT', '🇷🇺 Российские серверы'],
+        use: ['foreign_servers', 'ru_servers']
+      },
+      {
+        name: '💬 Discord',
+        type: 'select',
+        icon: 'https://raw.githubusercontent.com/remnawave/templates/refs/heads/main/icons/Discord.png',
+        proxies: ['♻️ Резерв (RU -> EU)', '🇷🇺 Российские серверы', '🌍 Иностранные серверы'],
+        use: ['ru_servers', 'foreign_servers']
+      },
+      {
+        name: '📞 WhatsApp',
+        type: 'select',
+        icon: 'https://cdn.jsdelivr.net/gh/Koolson/Qure@master/IconSet/Color/WhatsApp.png',
+        proxies: ['🌍 Иностранные серверы', '🇷🇺 Российские серверы', 'DIRECT'],
+        use: ['foreign_servers', 'ru_servers']
+      },
+      {
+        name: '▶️ YouTube',
+        type: 'select',
+        icon: 'https://cdn.jsdelivr.net/gh/Koolson/Qure@master/IconSet/Color/YouTube.png',
+        proxies: ['♻️ Резерв (RU -> EU)', '🇷🇺 Российские серверы', '🌍 Иностранные серверы'],
+        use: ['ru_servers', 'foreign_servers']
+      },
+      {
+        name: '📸 Instagram & Threads',
+        type: 'select',
+        icon: 'https://cdn.jsdelivr.net/gh/Koolson/Qure@master/IconSet/Color/Instagram.png',
+        proxies: ['🌍 Иностранные серверы', '🇷🇺 Российские серверы'],
+        use: ['foreign_servers', 'ru_servers']
+      },
+      {
+        name: '➤ Telegram',
+        type: 'select',
+        icon: 'https://cdn.jsdelivr.net/gh/Koolson/Qure@master/IconSet/Color/Telegram.png',
+        proxies: ['🌍 Иностранные серверы', '🇷🇺 Российские серверы', 'DIRECT'],
+        use: ['foreign_servers', 'ru_servers']
+      },
+      {
+        name: '🎵 TikTok',
+        type: 'select',
+        icon: 'https://cdn.jsdelivr.net/gh/Koolson/Qure@master/IconSet/Color/TikTok.png',
+        proxies: ['🌍 Иностранные серверы', '🇷🇺 Российские серверы'],
+        use: ['foreign_servers', 'ru_servers']
+      },
+      {
+        name: '🤖 AI (Нейронки)',
+        type: 'select',
+        icon: 'https://cdn.jsdelivr.net/gh/Koolson/Qure@master/IconSet/Color/Spark.png',
+        proxies: ['🌍 Иностранные серверы', '🇷🇺 Российские серверы'],
+        use: ['foreign_servers', 'ru_servers']
+      },
+      {
+        name: '👾 Brawl Stars',
+        type: 'select',
+        icon: 'https://cdn.jsdelivr.net/gh/Koolson/Qure@master/IconSet/Color/Game.png',
+        proxies: ['🌍 Иностранные серверы', '🇷🇺 Российские серверы'],
+        use: ['foreign_servers', 'ru_servers']
+      },
+      {
+        name: '🎮 Roblox',
+        type: 'select',
+        icon: 'https://cdn.jsdelivr.net/gh/Koolson/Qure@master/IconSet/Color/Game.png',
+        proxies: ['🌍 Иностранные серверы', '🇷🇺 Российские серверы'],
+        use: ['foreign_servers', 'ru_servers']
+      },
+      {
+        name: '👥 Facebook',
+        type: 'select',
+        icon: 'https://cdn.jsdelivr.net/gh/Koolson/Qure@master/IconSet/Color/Facebook.png',
+        proxies: ['🌍 Иностранные серверы', '🇷🇺 Российские серверы'],
+        use: ['foreign_servers', 'ru_servers']
+      },
+      {
+        name: '🇷🇺 Российские серверы',
+        type: 'select',
+        icon: 'https://cdn.jsdelivr.net/gh/Koolson/Qure@master/IconSet/Color/Russia.png',
+        proxies: ['♻️ Автовыбор (Россия)'],
+        use: ['ru_servers']
+      },
+      {
+        name: '🎮 Игры (DIRECT)',
+        type: 'select',
+        hidden: true,
+        icon: 'https://cdn.jsdelivr.net/gh/Koolson/Qure@master/IconSet/Color/Game.png',
+        proxies: ['DIRECT', '🌍 Иностранные серверы', '🇷🇺 Российские серверы'],
         use: ['foreign_servers', 'ru_servers']
       },
       {
         name: '📋 My Rules',
         type: 'select',
+        hidden: true,
         proxies: ['DIRECT', '🌍 Иностранные серверы', '🇷🇺 Российские серверы'],
         use: ['foreign_servers', 'ru_servers']
       }
@@ -324,16 +355,16 @@ function generateConfig(userName, ruProviderUrl, foreignProviderUrl) {
         type: 'http',
         behavior: 'domain',
         format: 'mrs',
-        url: 'https://github.com/MetaCubeX/meta-rules-dat/raw/meta/geo/geosite/category-ads-all.mrs',
+        url: 'https://github.com/legiz-ru/mihomo-rule-sets/raw/main/oisd/big.mrs',
         path: './rule-sets/oisd_big.mrs',
         interval: 86400
       },
       discord_voiceips: {
         behavior: 'ipcidr',
         type: 'http',
-        format: 'yaml',
-        url: 'https://raw.githubusercontent.com/LalatinaHub/Discord-IP-Ranges/main/Mihomo/Discord_IP.yaml',
-        path: './rule-sets/discord_voiceips.yaml',
+        format: 'mrs',
+        url: 'https://github.com/legiz-ru/mihomo-rule-sets/raw/main/other/discord-voice-ip-list.mrs',
+        path: './rule-sets/discord_voiceips.mrs',
         interval: 86400
       },
       'category-porn': {
@@ -398,14 +429,6 @@ function generateConfig(userName, ruProviderUrl, foreignProviderUrl) {
         format: 'yaml',
         url: 'https://raw.githubusercontent.com/MetaCubeX/meta-rules-dat/refs/heads/meta/geo/geosite/roblox.yaml',
         path: './rule-sets/roblox.yaml',
-        interval: 86400
-      },
-      'discord-ips': {
-        behavior: 'ipcidr',
-        type: 'http',
-        format: 'mrs',
-        url: 'https://github.com/MetaCubeX/meta-rules-dat/raw/meta/geo/geoip/discord.mrs',
-        path: './rule-sets/discord-ips.mrs',
         interval: 86400
       },
       'geosite-soundcloud': {
@@ -479,28 +502,89 @@ function generateConfig(userName, ruProviderUrl, foreignProviderUrl) {
         url: 'https://github.com/legiz-ru/mihomo-rule-sets/raw/main/other/ru-app-list.yaml',
         path: './rule-sets/ru-apps.yaml',
         interval: 86400
+      },
+      'whatsapp-domains': {
+        type: 'http',
+        behavior: 'domain',
+        format: 'mrs',
+        interval: 86400,
+        url: 'https://github.com/MetaCubeX/meta-rules-dat/raw/meta/geo/geosite/whatsapp.mrs',
+        path: './rule-sets/whatsapp-domains.mrs'
+      },
+      'facebook-ips': {
+        type: 'http',
+        behavior: 'ipcidr',
+        format: 'mrs',
+        interval: 86400,
+        url: 'https://github.com/MetaCubeX/meta-rules-dat/raw/meta/geo/geoip/facebook.mrs',
+        path: './rule-sets/facebook-ips.mrs'
+      },
+      'torrent-trackers': {
+        type: 'http',
+        behavior: 'domain',
+        format: 'mrs',
+        url: 'https://github.com/legiz-ru/mihomo-rule-sets/raw/main/other/torrent-trackers.mrs',
+        path: './rule-sets/torrent-trackers.mrs',
+        interval: 86400
+      },
+      'torrent-clients': {
+        type: 'http',
+        behavior: 'classical',
+        format: 'yaml',
+        url: 'https://github.com/legiz-ru/mihomo-rule-sets/raw/main/other/torrent-clients.yaml',
+        path: './rule-sets/torrent-clients.yaml',
+        interval: 86400
+      },
+      'games-direct': {
+        type: 'http',
+        behavior: 'classical',
+        format: 'yaml',
+        url: 'https://github.com/legiz-ru/mihomo-rule-sets/raw/main/other/games-direct.yaml',
+        path: './rule-sets/games-direct.yaml',
+        interval: 86400
+      },
+      'discord_vc': {
+        type: 'inline',
+        behavior: 'classical',
+        payload: [
+          'AND,((IP-CIDR,138.128.136.0/21),(NETWORK,udp),(DST-PORT,50000-50100))',
+          'AND,((IP-CIDR,162.158.0.0/15),(NETWORK,udp),(DST-PORT,50000-50100))',
+          'AND,((IP-CIDR,172.64.0.0/13),(NETWORK,udp),(DST-PORT,50000-50100))',
+          'AND,((IP-CIDR,34.0.0.0/15),(NETWORK,udp),(DST-PORT,50000-50100))',
+          'AND,((IP-CIDR,34.2.0.0/15),(NETWORK,udp),(DST-PORT,50000-50100))',
+          'AND,((IP-CIDR,35.192.0.0/12),(NETWORK,udp),(DST-PORT,50000-50100))',
+          'AND,((IP-CIDR,35.208.0.0/12),(NETWORK,udp),(DST-PORT,50000-50100))',
+          'AND,((IP-CIDR,5.200.14.128/25),(NETWORK,udp),(DST-PORT,50000-50100))',
+          'AND,((IP-CIDR,66.22.192.0/18),(NETWORK,udp),(DST-PORT,50000-50100))'
+        ]
       }
     },
     
     rules: [
+      'RULE-SET,oisd_big,🚫 Реклама',
+      'RULE-SET,games-direct,🎮 Игры (DIRECT)',
+      'RULE-SET,torrent-clients,DIRECT',
+      'PROCESS-NAME-REGEX,(?i).*torrent.*,DIRECT',
+      'RULE-SET,torrent-trackers,🌍 Иностранные серверы',
       'RULE-SET,ru_apps,DIRECT',
       'IP-CIDR,127.0.0.0/8,DIRECT,no-resolve',
       'IP-CIDR,192.168.0.0/16,DIRECT,no-resolve',
       'IP-CIDR,10.0.0.0/8,DIRECT,no-resolve',
       'IP-CIDR,172.16.0.0/12,DIRECT,no-resolve',
       'RULE-SET,geosite-youtube,▶️ YouTube',
-      'OR,((RULE-SET,geosite-discord),(RULE-SET,discord-ips),(PROCESS-NAME,Discord.exe)),💬 Discord',
+      'OR,((RULE-SET,geosite-discord),(RULE-SET,discord_voiceips),(PROCESS-NAME,Discord.exe)),💬 Discord',
+      'RULE-SET,discord_vc,💬 Discord',
+      'OR,((RULE-SET,facebook-ips),(RULE-SET,whatsapp-domains)),📞 WhatsApp',
       'RULE-SET,geosite-instagram,📸 Instagram & Threads',
       'RULE-SET,geosite-facebook,👥 Facebook',
-      'OR,((RULE-SET,telegram-ips),(RULE-SET,telegram-domains),(IP-ASN,59930),(PROCESS-NAME,org.telegram.messenger),(PROCESS-NAME,org.telegram.messenger.web),(PROCESS-NAME,org.telegram.plus),(PROCESS-NAME,org.thunderdog.challegram),(PROCESS-NAME,Telegram.exe),(PROCESS-NAME,Telegram)),➤ Telegram',
+      'OR,((RULE-SET,telegram-ips),(RULE-SET,telegram-domains)),➤ Telegram',
       'RULE-SET,geosite-tiktok,🎵 TikTok',
       'RULE-SET,geosite-soundcloud,🌍 Иностранные серверы',
-      'OR,((RULE-SET,geosite-openai),(RULE-SET,google-gemini),(RULE-SET,geosite-anthropic),(DOMAIN-KEYWORD,grok),(DOMAIN-SUFFIX,grok.com),(DOMAIN-SUFFIX,appcenter.ms),(DOMAIN-KEYWORD,copilot),(DOMAIN-SUFFIX,copilot.microsoft.com)),🤖 AI (Нейронки)',
+      'OR,((RULE-SET,geosite-openai),(RULE-SET,google-gemini),(RULE-SET,geosite-anthropic),(DOMAIN-KEYWORD,grok),(DOMAIN-SUFFIX,grok.com),(DOMAIN-SUFFIX,appcenter.ms),(DOMAIN-KEYWORD,copilot),(DOMAIN-SUFFIX,copilot.microsoft.com),(PROCESS-NAME-REGEX,(?i).*(chatgpt|claude|copilot|gemini|cursor|windsurf|cline|antigravity).*),(PROCESS-NAME,com.openai.chatgpt),(PROCESS-NAME,com.anthropic.claude),(PROCESS-NAME,com.microsoft.copilot),(PROCESS-NAME,ai.perplexity.app.android)),🤖 AI (Нейронки)',
       'RULE-SET,geosite-supercell,👾 Brawl Stars',
       'RULE-SET,geosite-roblox,🎮 Roblox',
       'RULE-SET,ru-blocked,🚫 Заблокированные сайты (RU)',
       'RULE-SET,category-porn,🔞 18+',
-      'RULE-SET,oisd_big,🚫 Реклама',
       'RULE-SET,my-rules,📋 My Rules',
       'GEOIP,RU,DIRECT',
       'DOMAIN-SUFFIX,ru,DIRECT',
@@ -592,9 +676,17 @@ async function buildAll() {
       }
     }
     
+    const sortProxies = (a, b) => {
+        const a10g = a.name.includes('10гбит') || a.name.includes('10G') || a.name.includes('10gbit');
+        const b10g = b.name.includes('10гбит') || b.name.includes('10G') || b.name.includes('10gbit');
+        if (a10g && !b10g) return -1;
+        if (!a10g && b10g) return 1;
+        return a.name.localeCompare(b.name);
+    };
+
     // Deduplicate
-    ruProxies = [...new Map(ruProxies.map(item => [item.name, item])).values()];
-    foreignProxies = [...new Map(foreignProxies.map(item => [item.name, item])).values()];
+    ruProxies = [...new Map(ruProxies.map(item => [item.name, item])).values()].sort(sortProxies);
+    foreignProxies = [...new Map(foreignProxies.map(item => [item.name, item])).values()].sort(sortProxies);
     
     if (ruProxies.length === 0 && foreignProxies.length === 0) {
       console.log(`[Warning] No proxies found for user ${user}. Skipping.`);
