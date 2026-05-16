@@ -53,24 +53,24 @@ async function parseProxy(content) {
   // AmneziaWG gives JSON keys, we rely on JSON.
   // Wait! A .conf file is INI format. The frontend didn't natively parse pure INI without the json wrapper.
   // If we need pure .conf parsing, we can add it here.
-  
+
   // Try raw WG/AWG .conf format
   if (content.includes('[Interface]') && content.includes('[Peer]')) {
     const proxy = { type: 'wireguard', udp: true };
     const lines = content.split('\n').map(l => l.trim());
-    
+
     // Extract basic fields
     const getVal = (key) => {
       const line = lines.find(l => l.toLowerCase().startsWith(key.toLowerCase() + ' ' + '=') || l.toLowerCase().startsWith(key.toLowerCase() + '='));
       if (line) return line.split('=')[1].trim();
       return null;
     };
-    
+
     proxy['private-key'] = getVal('PrivateKey');
     const addr = getVal('Address');
     if (addr) proxy.ip = addr.split('/')[0];
     proxy.mtu = parseInt(getVal('MTU'), 10) || 1376;
-    
+
     proxy['public-key'] = getVal('PublicKey');
     const endpoint = getVal('Endpoint');
     if (endpoint) {
@@ -78,12 +78,12 @@ async function parseProxy(content) {
       proxy.server = parts[0];
       proxy.port = parseInt(parts[1], 10);
     }
-    
+
     const psk = getVal('PresharedKey');
     if (psk) proxy['pre-shared-key'] = psk;
-    
+
     proxy.name = `awg-${proxy.server}`;
-    
+
     // Check AWG extra params
     const awgFields = ['Jc', 'Jmin', 'Jmax', 'S1', 'S2', 'S3', 'S4', 'H1', 'H2', 'H3', 'H4'];
     const amneziaOpts = {};
@@ -98,7 +98,7 @@ async function parseProxy(content) {
     if (hasAwg) {
       proxy['amnezia-wg-option'] = amneziaOpts;
     }
-    
+
     return proxy;
   }
 
@@ -114,7 +114,7 @@ function generateConfig(userName, ruProviderUrl, foreignProviderUrl) {
     'allow-lan': false,
     'unified-delay': true,
     'tcp-concurrent': true,
-    
+
     dns: {
       enable: true,
       listen: '127.0.0.1:6868',
@@ -138,7 +138,7 @@ function generateConfig(userName, ruProviderUrl, foreignProviderUrl) {
         'geosite:category-ru': ['77.88.8.8', '8.8.8.8']
       }
     },
-    
+
     tun: {
       enable: true,
       stack: 'mixed',
@@ -153,7 +153,7 @@ function generateConfig(userName, ruProviderUrl, foreignProviderUrl) {
         '224.0.0.0/3', '::/127', 'fc00::/7', 'fe80::/10', 'ff00::/8'
       ]
     },
-    
+
     sniffer: {
       enable: true,
       'force-dns-mapping': true,
@@ -163,7 +163,7 @@ function generateConfig(userName, ruProviderUrl, foreignProviderUrl) {
         TLS: { ports: [443, 8443] }
       }
     },
-    
+
     'proxy-providers': {
       ru_servers: {
         type: 'http',
@@ -188,7 +188,7 @@ function generateConfig(userName, ruProviderUrl, foreignProviderUrl) {
         }
       }
     },
-    
+
     'proxy-groups': [
       {
         name: '♻️ Автовыбор (Иностранные)',
@@ -246,8 +246,8 @@ function generateConfig(userName, ruProviderUrl, foreignProviderUrl) {
         name: '🚫 Реклама',
         type: 'select',
         icon: 'https://raw.githubusercontent.com/remnawave/templates/refs/heads/main/icons/AdBlock.png',
-        proxies: ['REJECT', 'DIRECT'],
-        use: []
+        proxies: ['REJECT', 'DIRECT', '🌍 Иностранные серверы', '🇷🇺 Российские серверы'],
+        use: ['foreign_servers', 'ru_servers']
       },
       {
         name: '🌐 Остальной трафик (MATCH)',
@@ -345,11 +345,11 @@ function generateConfig(userName, ruProviderUrl, foreignProviderUrl) {
         name: '📋 My Rules',
         type: 'select',
         hidden: true,
-        proxies: ['DIRECT', '🌍 Иностранные серверы', '🇷🇺 Российские серверы'],
+        proxies: ['🌍 Иностранные серверы', 'DIRECT', '🇷🇺 Российские серверы'],
         use: ['foreign_servers', 'ru_servers']
       }
     ],
-    
+
     'rule-providers': {
       oisd_big: {
         type: 'http',
@@ -559,7 +559,7 @@ function generateConfig(userName, ruProviderUrl, foreignProviderUrl) {
         ]
       }
     },
-    
+
     rules: [
       'RULE-SET,oisd_big,🚫 Реклама',
       'RULE-SET,games-direct,🎮 Игры (DIRECT)',
@@ -604,13 +604,13 @@ async function buildAll() {
   }
 
   const users = fs.readdirSync(DATA_DIR).filter(f => fs.statSync(path.join(DATA_DIR, f)).isDirectory());
-  
+
   for (const user of users) {
     const userDir = path.join(DATA_DIR, user);
     const ruDir = path.join(userDir, 'ru');
     const foreignDir = path.join(userDir, 'foreign');
     const tokenFile = path.join(userDir, 'token.txt');
-    
+
     // Безопасность: Генерируем или читаем токен подписки (anti-bruteforce)
     let token = '';
     if (fs.existsSync(tokenFile)) {
@@ -620,10 +620,10 @@ async function buildAll() {
       fs.writeFileSync(tokenFile, token);
       console.log(`[Info] Generated new secure token for user: ${user}`);
     }
-    
+
     let ruProxies = [];
     let foreignProxies = [];
-    
+
     // Parse RU servers
     if (fs.existsSync(ruDir)) {
       const files = fs.readdirSync(ruDir).sort();
@@ -631,25 +631,25 @@ async function buildAll() {
         const content = fs.readFileSync(path.join(ruDir, f), 'utf-8');
         const lines = content.split('\n');
         let validProxies = [];
-        
+
         for (let i = 0; i < lines.length; i++) {
           const proxy = await parseProxy(lines[i]);
           if (proxy) validProxies.push(proxy);
         }
-        
+
         if (content.includes('[Interface]') || content.trim().startsWith('{')) {
-           const proxy = await parseProxy(content);
-           if (proxy) validProxies.push(proxy);
+          const proxy = await parseProxy(content);
+          if (proxy) validProxies.push(proxy);
         }
-        
+
         const baseName = f.replace(/\.[^/.]+$/, "");
         validProxies.forEach((p, idx) => {
-           p.name = validProxies.length === 1 ? baseName : `${baseName}-${idx + 1}`;
-           ruProxies.push(p);
+          p.name = validProxies.length === 1 ? baseName : `${baseName}-${idx + 1}`;
+          ruProxies.push(p);
         });
       }
     }
-    
+
     // Parse Foreign servers
     if (fs.existsSync(foreignDir)) {
       const files = fs.readdirSync(foreignDir).sort();
@@ -657,60 +657,60 @@ async function buildAll() {
         const content = fs.readFileSync(path.join(foreignDir, f), 'utf-8');
         const lines = content.split('\n');
         let validProxies = [];
-        
+
         for (let i = 0; i < lines.length; i++) {
           const proxy = await parseProxy(lines[i]);
           if (proxy) validProxies.push(proxy);
         }
-        
+
         if (content.includes('[Interface]') || content.trim().startsWith('{')) {
-           const proxy = await parseProxy(content);
-           if (proxy) validProxies.push(proxy);
+          const proxy = await parseProxy(content);
+          if (proxy) validProxies.push(proxy);
         }
-        
+
         const baseName = f.replace(/\.[^/.]+$/, "");
         validProxies.forEach((p, idx) => {
-           p.name = validProxies.length === 1 ? baseName : `${baseName}-${idx + 1}`;
-           foreignProxies.push(p);
+          p.name = validProxies.length === 1 ? baseName : `${baseName}-${idx + 1}`;
+          foreignProxies.push(p);
         });
       }
     }
-    
+
     const sortProxies = (a, b) => {
-        const a10g = a.name.includes('10гбит') || a.name.includes('10G') || a.name.includes('10gbit');
-        const b10g = b.name.includes('10гбит') || b.name.includes('10G') || b.name.includes('10gbit');
-        if (a10g && !b10g) return -1;
-        if (!a10g && b10g) return 1;
-        return a.name.localeCompare(b.name);
+      const a10g = a.name.includes('10гбит') || a.name.includes('10G') || a.name.includes('10gbit');
+      const b10g = b.name.includes('10гбит') || b.name.includes('10G') || b.name.includes('10gbit');
+      if (a10g && !b10g) return -1;
+      if (!a10g && b10g) return 1;
+      return a.name.localeCompare(b.name);
     };
 
     // Deduplicate
     ruProxies = [...new Map(ruProxies.map(item => [item.name, item])).values()].sort(sortProxies);
     foreignProxies = [...new Map(foreignProxies.map(item => [item.name, item])).values()].sort(sortProxies);
-    
+
     if (ruProxies.length === 0 && foreignProxies.length === 0) {
       console.log(`[Warning] No proxies found for user ${user}. Skipping.`);
       continue;
     }
-    
+
     const ruPath = path.join(PROVIDERS_DIR, `${token}_ru.yaml`);
     const foreignPath = path.join(PROVIDERS_DIR, `${token}_foreign.yaml`);
     const configPath = path.join(CONFIGS_DIR, `${token}`);
-    
+
     // Write Providers
     fs.writeFileSync(ruPath, yaml.dump({ proxies: ruProxies }, { indent: 2, lineWidth: -1 }));
     fs.writeFileSync(foreignPath, yaml.dump({ proxies: foreignProxies }, { indent: 2, lineWidth: -1 }));
-    
+
     // Write Master Config
     const masterConfig = generateConfig(
-      user, 
-      `${BASE_URL}/providers/${token}_ru.yaml`, 
+      user,
+      `${BASE_URL}/providers/${token}_ru.yaml`,
       `${BASE_URL}/providers/${token}_foreign.yaml`
     );
-    
+
     // Вшиваем имя профиля прямо в YAML (поддерживается многими клиентами)
     masterConfig['profile-name'] = 'k3k.lol VPN';
-    
+
     // --- ПОЛЬЗОВАТЕЛЬСКИЕ ПЕРЕОПРЕДЕЛЕНИЯ (custom.yaml) ---
     const customPath = path.join(userDir, 'custom.yaml');
     if (fs.existsSync(customPath)) {
@@ -743,7 +743,7 @@ async function buildAll() {
       }
     }
     // ------------------------------------------------------
-    
+
     fs.writeFileSync(configPath, yaml.dump(masterConfig, { indent: 2, lineWidth: -1 }));
     console.log(`[Success] Generated configs for user: ${user}`);
     console.log(`  -> Subscription Link: ${BASE_URL}/configs/${token}`);
