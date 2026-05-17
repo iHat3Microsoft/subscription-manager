@@ -561,7 +561,6 @@ function generateConfig(userName, ruProviderUrl, foreignProviderUrl) {
     },
 
     rules: [
-      'RULE-SET,oisd_big,🚫 Реклама',
       'RULE-SET,games-direct,🎮 Игры (DIRECT)',
       'RULE-SET,torrent-clients,DIRECT',
       'PROCESS-NAME-REGEX,(?i).*torrent.*,DIRECT',
@@ -571,6 +570,8 @@ function generateConfig(userName, ruProviderUrl, foreignProviderUrl) {
       'IP-CIDR,192.168.0.0/16,DIRECT,no-resolve',
       'IP-CIDR,10.0.0.0/8,DIRECT,no-resolve',
       'IP-CIDR,172.16.0.0/12,DIRECT,no-resolve',
+      'OR,((RULE-SET,geosite-openai),(RULE-SET,google-gemini),(RULE-SET,geosite-anthropic),(DOMAIN-KEYWORD,grok),(DOMAIN-SUFFIX,grok.com),(DOMAIN-SUFFIX,appcenter.ms),(DOMAIN-KEYWORD,copilot),(DOMAIN-SUFFIX,copilot.microsoft.com),(PROCESS-NAME-REGEX,(?i).*(chatgpt|claude|copilot|gemini|cursor|windsurf|cline|antigravity).*),(PROCESS-NAME,com.openai.chatgpt),(PROCESS-NAME,com.anthropic.claude),(PROCESS-NAME,com.microsoft.copilot),(PROCESS-NAME,ai.perplexity.app.android)),🤖 AI (Нейронки)',
+      'RULE-SET,oisd_big,🚫 Реклама',
       'RULE-SET,geosite-youtube,▶️ YouTube',
       'OR,((RULE-SET,geosite-discord),(RULE-SET,discord_voiceips),(PROCESS-NAME,Discord.exe)),💬 Discord',
       'RULE-SET,discord_vc,💬 Discord',
