@@ -253,7 +253,7 @@ function generateConfig(userName, ruProviderUrl, foreignProviderUrl) {
         name: '🌐 Остальной трафик (MATCH)',
         type: 'select',
         icon: 'https://cdn.jsdelivr.net/gh/Koolson/Qure@master/IconSet/Color/Auto.png',
-        proxies: ['🌍 Иностранные серверы', 'DIRECT', '🇷🇺 Российские серверы'],
+        proxies: ['DIRECT', '🌍 Иностранные серверы', '🇷🇺 Российские серверы'],
         use: ['foreign_servers', 'ru_servers']
       },
       {
