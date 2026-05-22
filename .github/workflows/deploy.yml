@@ -1,14 +1,6 @@
 name: Deploy subscription-manager
 
 on:
-  push:
-    branches: ["master"]
-    paths:
-      - "src/**"
-      - "package.json"
-      - "package-lock.json"
-      - "README.md"
-      - ".github/workflows/deploy.yml"
   workflow_dispatch:
 
 jobs:
@@ -30,4 +22,4 @@ jobs:
 
       - name: Run remote deploy command
         run: |
-          ssh -p "${{ secrets.DEPLOY_PORT }}" "${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }}"
+          ssh -o BatchMode=yes -o StrictHostKeyChecking=yes -o ConnectTimeout=20 -p "${{ secrets.DEPLOY_PORT }}" "${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }}" "true"
