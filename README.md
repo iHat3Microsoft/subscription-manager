@@ -72,3 +72,47 @@
    BASE_URL=https://newdomain.com node src/build.js
    ```
 3. Клиентам придется обновить ссылку в приложении один раз. После этого автообновление будет работать через новый домен.
+
+## GitHub Actions автодеплой
+
+В репозитории есть workflow: `.github/workflows/deploy.yml`.
+Он по `push` в `master` подключается по SSH и запускает серверный deploy через forced command.
+
+### 1) Настройка безопасного deploy-пользователя на Ubuntu 24
+
+```bash
+sudo adduser --disabled-password --gecos "" deploy-bot
+sudo install -o root -g root -m 755 ops/subman-deploy.sh /usr/local/bin/subman-deploy.sh
+sudo chown -R deploy-bot:deploy-bot /opt/subscription-manager
+```
+
+Сгенерируйте SSH-ключ локально (для GitHub Actions), публичный ключ добавьте в
+`/home/deploy-bot/.ssh/authorized_keys` с жесткими ограничениями:
+
+```text
+command="/usr/local/bin/subman-deploy.sh",no-agent-forwarding,no-port-forwarding,no-pty,no-user-rc,no-X11-forwarding ssh-ed25519 AAAA... github-actions
+```
+
+```bash
+sudo mkdir -p /home/deploy-bot/.ssh
+sudo chown deploy-bot:deploy-bot /home/deploy-bot/.ssh
+sudo chmod 700 /home/deploy-bot/.ssh
+sudo nano /home/deploy-bot/.ssh/authorized_keys
+sudo chown deploy-bot:deploy-bot /home/deploy-bot/.ssh/authorized_keys
+sudo chmod 600 /home/deploy-bot/.ssh/authorized_keys
+```
+
+### 2) Secrets в GitHub
+
+Добавьте secrets:
+- `DEPLOY_HOST` (например `sub.k3k.lol`)
+- `DEPLOY_PORT` (обычно `22`)
+- `DEPLOY_USER` (`deploy-bot`)
+- `DEPLOY_SSH_KEY` (приватный ключ от пары выше)
+
+### 3) Что делает deploy
+
+`/usr/local/bin/subman-deploy.sh`:
+- `git pull --ff-only origin master`
+- `npm ci --omit=dev`
+- `BASE_URL=https://sub.k3k.lol node src/build.js`
