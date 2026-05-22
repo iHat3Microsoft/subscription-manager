@@ -320,6 +320,13 @@ function generateConfig(userName, ruProviderUrl, foreignProviderUrl) {
         use: ['foreign_servers', 'ru_servers']
       },
       {
+        name: '🎮 Steam',
+        type: 'select',
+        icon: 'https://cdn.jsdelivr.net/gh/Koolson/Qure@master/IconSet/Color/Game.png',
+        proxies: ['🌍 Иностранные серверы', 'DIRECT', '🇷🇺 Российские серверы'],
+        use: ['foreign_servers', 'ru_servers']
+      },
+      {
         name: '👥 Facebook',
         type: 'select',
         icon: 'https://cdn.jsdelivr.net/gh/Koolson/Qure@master/IconSet/Color/Facebook.png',
@@ -543,6 +550,14 @@ function generateConfig(userName, ruProviderUrl, foreignProviderUrl) {
         path: './rule-sets/games-direct.yaml',
         interval: 86400
       },
+      steam: {
+        type: 'http',
+        behavior: 'domain',
+        format: 'mrs',
+        interval: 86400,
+        url: 'https://raw.githubusercontent.com/MetaCubeX/meta-rules-dat/meta/geo/geosite/steam.mrs',
+        path: './rule-sets/steam.mrs'
+      },
       'discord_vc': {
         type: 'inline',
         behavior: 'classical',
@@ -562,6 +577,7 @@ function generateConfig(userName, ruProviderUrl, foreignProviderUrl) {
 
     rules: [
       'RULE-SET,oisd_big,🚫 Реклама',
+      'RULE-SET,steam,🎮 Steam',
       'RULE-SET,games-direct,🎮 Игры (DIRECT)',
       'RULE-SET,torrent-clients,DIRECT',
       'PROCESS-NAME-REGEX,(?i).*torrent.*,DIRECT',
@@ -571,6 +587,8 @@ function generateConfig(userName, ruProviderUrl, foreignProviderUrl) {
       'IP-CIDR,192.168.0.0/16,DIRECT,no-resolve',
       'IP-CIDR,10.0.0.0/8,DIRECT,no-resolve',
       'IP-CIDR,172.16.0.0/12,DIRECT,no-resolve',
+      'AND,((NETWORK,tcp),(DST-PORT,22)),DIRECT',
+      'PROCESS-NAME,ssh,DIRECT',
       'RULE-SET,geosite-youtube,▶️ YouTube',
       'OR,((RULE-SET,geosite-discord),(RULE-SET,discord_voiceips),(PROCESS-NAME,Discord.exe)),💬 Discord',
       'RULE-SET,discord_vc,💬 Discord',
@@ -580,7 +598,7 @@ function generateConfig(userName, ruProviderUrl, foreignProviderUrl) {
       'OR,((RULE-SET,telegram-ips),(RULE-SET,telegram-domains)),➤ Telegram',
       'RULE-SET,geosite-tiktok,🎵 TikTok',
       'RULE-SET,geosite-soundcloud,🌍 Иностранные серверы',
-      'OR,((RULE-SET,geosite-openai),(RULE-SET,google-gemini),(RULE-SET,geosite-anthropic),(DOMAIN-KEYWORD,grok),(DOMAIN-SUFFIX,grok.com),(DOMAIN-SUFFIX,appcenter.ms),(DOMAIN-KEYWORD,copilot),(DOMAIN-SUFFIX,copilot.microsoft.com),(PROCESS-NAME-REGEX,(?i).*(chatgpt|claude|copilot|gemini|cursor|windsurf|cline|antigravity).*),(PROCESS-NAME,com.openai.chatgpt),(PROCESS-NAME,com.anthropic.claude),(PROCESS-NAME,com.microsoft.copilot),(PROCESS-NAME,ai.perplexity.app.android)),🤖 AI (Нейронки)',
+      'OR,((RULE-SET,geosite-openai),(RULE-SET,google-gemini),(RULE-SET,geosite-anthropic),(DOMAIN-KEYWORD,grok),(DOMAIN-SUFFIX,grok.com),(DOMAIN-SUFFIX,appcenter.ms),(DOMAIN-KEYWORD,copilot),(DOMAIN-SUFFIX,copilot.microsoft.com),(PROCESS-NAME-REGEX,(?i).*(chatgpt|claude|copilot|gemini|cursor|windsurf|cline|antigravity|opencode).*),(PROCESS-NAME,opencode),(PROCESS-NAME,com.openai.chatgpt),(PROCESS-NAME,com.anthropic.claude),(PROCESS-NAME,com.microsoft.copilot),(PROCESS-NAME,ai.perplexity.app.android)),🤖 AI (Нейронки)',
       'RULE-SET,geosite-supercell,👾 Brawl Stars',
       'RULE-SET,geosite-roblox,🎮 Roblox',
       'RULE-SET,ru-blocked,🚫 Заблокированные сайты (RU)',
