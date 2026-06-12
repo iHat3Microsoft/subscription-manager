@@ -715,14 +715,6 @@ function toIntOrRangeMaybe(v) {
   return `${m[1]}-${m[2]}`;
 }
 
-function normalizeAwgVersion(rawVersion, hasV20, hasV15) {
-  const v = String(rawVersion ?? '').trim().toLowerCase();
-  if (v === '2' || v === '2.0') return '2.0';
-  if (v === '1.5') return '1.5';
-  if (v === '1' || v === '1.0') return '1.0';
-  return hasV20 ? '2.0' : (hasV15 ? '1.5' : '1.0');
-}
-
 function hasAnyAwgKey(obj) {
   const keys = [
     'Jc','Jmin','Jmax',
@@ -803,18 +795,6 @@ function parseAmneziaWireGuardBaseProxy(serverConfig, protocolConfig, clientConf
   const mtu = toIntMaybe(clientConfig.mtu);
   if (mtu !== null) proxy.mtu = mtu;
 
-  const dns1 = String(serverConfig.dns1 || '').trim();
-  if (dns1) {
-    proxy.dns = [dns1];
-  } else {
-    const cfgText = String(clientConfig.config || '');
-    const mDns = cfgText.match(/^\s*DNS\s*=\s*([^\r\n]+)/im);
-    if (mDns && mDns[1]) {
-      const firstDns = mDns[1].split(',')[0].trim();
-      if (firstDns) proxy.dns = [firstDns];
-    }
-  }
-
   return proxy;
 }
 
@@ -834,9 +814,7 @@ function parseAmneziaAwgProxy(serverConfig, container) {
   const proxy = parseAmneziaWireGuardBaseProxy(serverConfig, protocolConfig, clientConfig, 'awg');
   if (!proxy) return null;
 
-  const { awg, hasV20, hasV15 } = collectAwgOptions(clientConfig);
-  const awgVersion = normalizeAwgVersion(protocolConfig.protocol_version, hasV20, hasV15);
-  proxy.awgVersion = awgVersion;
+  const { awg } = collectAwgOptions(clientConfig);
   proxy['amnezia-wg-option'] = awg;
 
   return proxy;
@@ -992,11 +970,8 @@ function parseWireGuardConfig(text) {
   if (mtu !== null) proxy.mtu = mtu;
   const psk = getAwgKey(peer, 'PresharedKey');
   if (psk) proxy['pre-shared-key'] = psk;
-  const dns = getAwgKey(iface, 'DNS');
-  if (dns) proxy.dns = [dns.split(',')[0].trim()];
   if (isAmnezia) {
-    const { awg, hasV20, hasV15 } = collectAwgOptions(iface);
-    proxy.awgVersion = normalizeAwgVersion('', hasV20, hasV15);
+    const { awg } = collectAwgOptions(iface);
     proxy['amnezia-wg-option'] = awg;
   }
   return proxy;
@@ -1047,4 +1022,4 @@ function uniqueServerName(name) {
   return name + '-' + i;
 }
 
-module.exports = { parseVless, parseVmess, parseSS, parseTrojan, parseHysteria2, parseTuic, parseAmneziaWireGuardProxy, parseAmneziaAwgProxy, parseAmneziaVlessProxy, parseProxyUrl };
+module.exports = { parseVless, parseVmess, parseSS, parseTrojan, parseHysteria2, parseTuic, parseAmneziaWireGuardProxy, parseAmneziaAwgProxy, parseAmneziaVlessProxy, parseWireGuardConfig, parseProxyUrl };

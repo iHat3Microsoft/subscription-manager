@@ -56,50 +56,7 @@ async function parseProxy(content) {
 
   // Try raw WG/AWG .conf format
   if (content.includes('[Interface]') && content.includes('[Peer]')) {
-    const proxy = { type: 'wireguard', udp: true };
-    const lines = content.split('\n').map(l => l.trim());
-
-    // Extract basic fields
-    const getVal = (key) => {
-      const line = lines.find(l => l.toLowerCase().startsWith(key.toLowerCase() + ' ' + '=') || l.toLowerCase().startsWith(key.toLowerCase() + '='));
-      if (line) return line.split('=')[1].trim();
-      return null;
-    };
-
-    proxy['private-key'] = getVal('PrivateKey');
-    const addr = getVal('Address');
-    if (addr) proxy.ip = addr.split('/')[0];
-    proxy.mtu = parseInt(getVal('MTU'), 10) || 1376;
-
-    proxy['public-key'] = getVal('PublicKey');
-    const endpoint = getVal('Endpoint');
-    if (endpoint) {
-      const parts = endpoint.split(':');
-      proxy.server = parts[0];
-      proxy.port = parseInt(parts[1], 10);
-    }
-
-    const psk = getVal('PresharedKey');
-    if (psk) proxy['pre-shared-key'] = psk;
-
-    proxy.name = `awg-${proxy.server}`;
-
-    // Check AWG extra params
-    const awgFields = ['Jc', 'Jmin', 'Jmax', 'S1', 'S2', 'S3', 'S4', 'H1', 'H2', 'H3', 'H4'];
-    const amneziaOpts = {};
-    let hasAwg = false;
-    for (const f of awgFields) {
-      const v = getVal(f);
-      if (v) {
-        amneziaOpts[f.toLowerCase()] = isNaN(parseInt(v)) ? v : parseInt(v);
-        hasAwg = true;
-      }
-    }
-    if (hasAwg) {
-      proxy['amnezia-wg-option'] = amneziaOpts;
-    }
-
-    return proxy;
+    return parsers.parseWireGuardConfig(content);
   }
 
   return null;
@@ -292,6 +249,13 @@ function generateConfig(userName, ruProviderUrl, foreignProviderUrl) {
         use: ['foreign_servers', 'ru_servers']
       },
       {
+        name: '🔎 Google',
+        type: 'select',
+        icon: 'https://cdn.jsdelivr.net/gh/Koolson/Qure@master/IconSet/Color/Google_Search.png',
+        proxies: ['DIRECT', '🌍 Иностранные серверы', '🇷🇺 Российские серверы'],
+        use: ['foreign_servers', 'ru_servers']
+      },
+      {
         name: '🎵 TikTok',
         type: 'select',
         icon: 'https://cdn.jsdelivr.net/gh/Koolson/Qure@master/IconSet/Color/TikTok.png',
@@ -462,6 +426,22 @@ function generateConfig(userName, ruProviderUrl, foreignProviderUrl) {
         path: './rule-sets/telegram-ips.mrs',
         interval: 86400
       },
+      'geosite-google': {
+        behavior: 'domain',
+        type: 'http',
+        format: 'mrs',
+        url: 'https://github.com/MetaCubeX/meta-rules-dat/raw/meta/geo/geosite/google.mrs',
+        path: './rule-sets/google.mrs',
+        interval: 86400
+      },
+      'google-geoip': {
+        behavior: 'ipcidr',
+        type: 'http',
+        format: 'mrs',
+        url: 'https://github.com/MetaCubeX/meta-rules-dat/raw/meta/geo/geoip/google.mrs',
+        path: './rule-sets/google-geoip.mrs',
+        interval: 86400
+      },
       'geosite-openai': {
         behavior: 'domain',
         type: 'http',
@@ -596,6 +576,10 @@ function generateConfig(userName, ruProviderUrl, foreignProviderUrl) {
       'RULE-SET,geosite-instagram,📸 Instagram & Threads',
       'RULE-SET,geosite-facebook,👥 Facebook',
       'OR,((RULE-SET,telegram-ips),(RULE-SET,telegram-domains)),➤ Telegram',
+      'PROCESS-NAME-REGEX,(?i).*ayugram.*,➤ Telegram',
+      'PROCESS-NAME-REGEX,(?i).*telegram.*,➤ Telegram',
+      'PROCESS-NAME,org.telegram.messenger,➤ Telegram',
+      'OR,((RULE-SET,google-geoip),(RULE-SET,geosite-google)),🔎 Google',
       'RULE-SET,geosite-tiktok,🎵 TikTok',
       'RULE-SET,geosite-soundcloud,🌍 Иностранные серверы',
       'OR,((RULE-SET,geosite-openai),(RULE-SET,google-gemini),(RULE-SET,geosite-anthropic),(DOMAIN-KEYWORD,grok),(DOMAIN-SUFFIX,grok.com),(DOMAIN-SUFFIX,appcenter.ms),(DOMAIN-KEYWORD,copilot),(DOMAIN-SUFFIX,copilot.microsoft.com),(PROCESS-NAME-REGEX,(?i).*(chatgpt|claude|copilot|gemini|cursor|windsurf|cline|antigravity|opencode).*),(PROCESS-NAME,opencode),(PROCESS-NAME,com.openai.chatgpt),(PROCESS-NAME,com.anthropic.claude),(PROCESS-NAME,com.microsoft.copilot),(PROCESS-NAME,ai.perplexity.app.android)),🤖 AI (Нейронки)',
@@ -727,7 +711,7 @@ async function buildAll() {
     );
 
     // Вшиваем имя профиля прямо в YAML (поддерживается многими клиентами)
-    masterConfig['profile-name'] = 'k3k.lol VPN';
+    masterConfig['profile-name'] = 'uvx.lol VPN';
 
     // --- ПОЛЬЗОВАТЕЛЬСКИЕ ПЕРЕОПРЕДЕЛЕНИЯ (custom.yaml) ---
     const customPath = path.join(userDir, 'custom.yaml');
