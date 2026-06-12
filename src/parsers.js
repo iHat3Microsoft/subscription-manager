@@ -768,6 +768,12 @@ function collectAwgOptions(obj) {
   return { awg, hasV20, hasV15 };
 }
 
+function setWireGuardDns(proxy, dns) {
+  if (!dns) return;
+  proxy.dns = [dns];
+  proxy['remote-dns-resolve'] = true;
+}
+
 function parseAmneziaWireGuardBaseProxy(serverConfig, protocolConfig, clientConfig, namePrefix) {
   const server = String(clientConfig.hostName || serverConfig.hostName || '').trim();
   const port = Number(clientConfig.port ?? protocolConfig.port);
@@ -794,6 +800,17 @@ function parseAmneziaWireGuardBaseProxy(serverConfig, protocolConfig, clientConf
   if (psk) proxy['pre-shared-key'] = psk;
   const mtu = toIntMaybe(clientConfig.mtu);
   if (mtu !== null) proxy.mtu = mtu;
+
+  const dns1 = String(serverConfig.dns1 || '').trim();
+  if (dns1) {
+    setWireGuardDns(proxy, dns1);
+  } else {
+    const cfgText = String(clientConfig.config || '');
+    const mDns = cfgText.match(/^\s*DNS\s*=\s*([^\r\n]+)/im);
+    if (mDns && mDns[1]) {
+      setWireGuardDns(proxy, mDns[1].split(',')[0].trim());
+    }
+  }
 
   return proxy;
 }
@@ -970,6 +987,8 @@ function parseWireGuardConfig(text) {
   if (mtu !== null) proxy.mtu = mtu;
   const psk = getAwgKey(peer, 'PresharedKey');
   if (psk) proxy['pre-shared-key'] = psk;
+  const dns = getAwgKey(iface, 'DNS');
+  if (dns) setWireGuardDns(proxy, dns.split(',')[0].trim());
   if (isAmnezia) {
     const { awg } = collectAwgOptions(iface);
     proxy['amnezia-wg-option'] = awg;
