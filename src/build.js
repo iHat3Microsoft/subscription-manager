@@ -277,13 +277,6 @@ function generateConfig(userName, ruProviderUrl, foreignProviderUrl) {
         use: ['foreign_servers', 'ru_servers']
       },
       {
-        name: '🎮 Roblox',
-        type: 'select',
-        icon: 'https://cdn.jsdelivr.net/gh/Koolson/Qure@master/IconSet/Color/Game.png',
-        proxies: ['🌍 Иностранные серверы', '🇷🇺 Российские серверы'],
-        use: ['foreign_servers', 'ru_servers']
-      },
-      {
         name: '🎮 Steam',
         type: 'select',
         icon: 'https://cdn.jsdelivr.net/gh/Koolson/Qure@master/IconSet/Color/Game.png',
@@ -392,14 +385,6 @@ function generateConfig(userName, ruProviderUrl, foreignProviderUrl) {
         format: 'mrs',
         url: 'https://github.com/MetaCubeX/meta-rules-dat/raw/meta/geo/geosite/supercell.mrs',
         path: './rule-sets/supercell.mrs',
-        interval: 86400
-      },
-      'geosite-roblox': {
-        behavior: 'domain',
-        type: 'http',
-        format: 'yaml',
-        url: 'https://raw.githubusercontent.com/MetaCubeX/meta-rules-dat/refs/heads/meta/geo/geosite/roblox.yaml',
-        path: './rule-sets/roblox.yaml',
         interval: 86400
       },
       'geosite-soundcloud': {
@@ -584,7 +569,6 @@ function generateConfig(userName, ruProviderUrl, foreignProviderUrl) {
       'RULE-SET,geosite-soundcloud,🌍 Иностранные серверы',
       'OR,((RULE-SET,geosite-openai),(RULE-SET,google-gemini),(RULE-SET,geosite-anthropic),(DOMAIN-KEYWORD,grok),(DOMAIN-SUFFIX,grok.com),(DOMAIN-SUFFIX,appcenter.ms),(DOMAIN-KEYWORD,copilot),(DOMAIN-SUFFIX,copilot.microsoft.com),(PROCESS-NAME-REGEX,(?i).*(chatgpt|claude|copilot|gemini|cursor|windsurf|cline|antigravity|opencode).*),(PROCESS-NAME,opencode),(PROCESS-NAME,com.openai.chatgpt),(PROCESS-NAME,com.anthropic.claude),(PROCESS-NAME,com.microsoft.copilot),(PROCESS-NAME,ai.perplexity.app.android)),🤖 AI (Нейронки)',
       'RULE-SET,geosite-supercell,👾 Brawl Stars',
-      'RULE-SET,geosite-roblox,🎮 Roblox',
       'RULE-SET,ru-blocked,🚫 Заблокированные сайты (RU)',
       'RULE-SET,category-porn,🔞 18+',
       'RULE-SET,my-rules,📋 My Rules',
