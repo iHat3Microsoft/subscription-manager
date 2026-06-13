@@ -217,7 +217,7 @@ function generateConfig(userName, ruProviderUrl, foreignProviderUrl) {
         name: '💬 Discord',
         type: 'select',
         icon: 'https://raw.githubusercontent.com/remnawave/templates/refs/heads/main/icons/Discord.png',
-        proxies: ['♻️ Резерв (RU -> EU)', '🇷🇺 Российские серверы', '🌍 Иностранные серверы'],
+        proxies: ['♻️ Резерв (RU -> EU)', '🇷🇺 Российские серверы', '🌍 Иностранные серверы', 'DIRECT'],
         use: ['ru_servers', 'foreign_servers']
       },
       {
@@ -231,7 +231,7 @@ function generateConfig(userName, ruProviderUrl, foreignProviderUrl) {
         name: '▶️ YouTube',
         type: 'select',
         icon: 'https://cdn.jsdelivr.net/gh/Koolson/Qure@master/IconSet/Color/YouTube.png',
-        proxies: ['♻️ Резерв (RU -> EU)', '🇷🇺 Российские серверы', '🌍 Иностранные серверы'],
+        proxies: ['♻️ Резерв (RU -> EU)', '🇷🇺 Российские серверы', '🌍 Иностранные серверы', 'DIRECT'],
         use: ['ru_servers', 'foreign_servers']
       },
       {
