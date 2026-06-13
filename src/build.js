@@ -371,6 +371,14 @@ function generateConfig(userName, ruProviderUrl, foreignProviderUrl) {
         path: './rule-sets/facebook.mrs',
         interval: 86400
       },
+      'geosite-meta': {
+        behavior: 'domain',
+        type: 'http',
+        format: 'mrs',
+        url: 'https://github.com/MetaCubeX/meta-rules-dat/raw/meta/geo/geosite/meta.mrs',
+        path: './rule-sets/meta.mrs',
+        interval: 86400
+      },
       'geosite-tiktok': {
         behavior: 'domain',
         type: 'http',
@@ -557,8 +565,11 @@ function generateConfig(userName, ruProviderUrl, foreignProviderUrl) {
       'RULE-SET,geosite-youtube,▶️ YouTube',
       'OR,((RULE-SET,geosite-discord),(RULE-SET,discord_voiceips),(PROCESS-NAME,Discord.exe)),💬 Discord',
       'RULE-SET,discord_vc,💬 Discord',
+      'PROCESS-NAME,com.instagram.android,📸 Instagram & Threads',
+      'PROCESS-NAME,com.instagram.barcelona,📸 Instagram & Threads',
+      'OR,((RULE-SET,geosite-instagram),(RULE-SET,geosite-meta),(DOMAIN-SUFFIX,cdninstagram.com),(DOMAIN-SUFFIX,fbcdn.net),(DOMAIN-SUFFIX,fbsbx.com),(DOMAIN-SUFFIX,instagram.com),(DOMAIN-SUFFIX,threads.net),(DOMAIN-SUFFIX,graph.instagram.com),(DOMAIN-SUFFIX,graph.facebook.com),(DOMAIN-KEYWORD,instagram)),📸 Instagram & Threads',
+      'IP-ASN,32934,📸 Instagram & Threads',
       'OR,((RULE-SET,facebook-ips),(RULE-SET,whatsapp-domains)),📞 WhatsApp',
-      'RULE-SET,geosite-instagram,📸 Instagram & Threads',
       'RULE-SET,geosite-facebook,👥 Facebook',
       'OR,((RULE-SET,telegram-ips),(RULE-SET,telegram-domains)),➤ Telegram',
       'PROCESS-NAME-REGEX,(?i).*ayugram.*,➤ Telegram',
