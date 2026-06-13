@@ -280,7 +280,7 @@ function generateConfig(userName, ruProviderUrl, foreignProviderUrl) {
         name: '🎮 Steam',
         type: 'select',
         icon: 'https://cdn.jsdelivr.net/gh/Koolson/Qure@master/IconSet/Color/Game.png',
-        proxies: ['🌍 Иностранные серверы', 'DIRECT', '🇷🇺 Российские серверы'],
+        proxies: ['DIRECT', '🌍 Иностранные серверы', '🇷🇺 Российские серверы'],
         use: ['foreign_servers', 'ru_servers']
       },
       {
