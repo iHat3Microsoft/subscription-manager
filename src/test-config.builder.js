@@ -73,9 +73,9 @@ function buildConfig(packages) {
       'use-system-hosts': true,
       'respect-rules': true,
       'default-nameserver': [
-        'https://dns.quad9.net/dns-query#PROXY',
-        'https://cloudflare-dns.com/dns-query#PROXY',
-        'https://8.8.8.8/dns-query#PROXY'
+        '9.9.9.9',
+        '1.1.1.1',
+        '8.8.8.8'
       ],
       'proxy-server-nameserver': [
         'https://dns.quad9.net/dns-query#PROXY',
@@ -86,14 +86,13 @@ function buildConfig(packages) {
         '8.8.8.8'
       ],
       nameserver: [
-        'https://dns.quad9.net/dns-query#PROXY',
-        'https://cloudflare-dns.com/dns-query#PROXY',
-        'https://8.8.8.8/dns-query#PROXY'
+        'tls://9.9.9.9',
+        'https://dns.quad9.net/dns-query',
+        'https://cloudflare-dns.com/dns-query'
       ],
       fallback: [
-        'tls://9.9.9.9',
-        'https://dns.quad9.net/dns-query#PROXY',
-        'https://cloudflare-dns.com/dns-query#PROXY'
+        'tls://1.1.1.1',
+        'https://cloudflare-dns.com/dns-query'
       ],
       'fallback-filter': {
         geoip: true,

@@ -13,11 +13,10 @@
 ### Что сделано (dev branch)
 
 - [x] `src/test-config.builder.js` — генератор тестового конфига без `proxy-providers`.
-- [x] Парсинг `ru-app-list.yaml` (legiz) → 526 уникальных пакетов в `data/ru-packages.txt`.
-- [x] `data/ru-apps-classical.yaml` — 526 правил `PROCESS-NAME,xxx` (формат rule-provider), можно захостить на гит/сервере и подключить как `RULE-SET,ru_apps_custom,DIRECT`.
+- [x] Парсинг `ru-app-list.yaml` (legiz) → 526 уникальных пакетов в `data/ru-packages.txt` (локально, в гит не пушим).
 - [x] DNS: `redir-host` (без fake-ip), `respect-rules: true`, `proxy-server-nameserver` через тег `#PROXY`, `nameserver-policy` для `+.omarchy.org`/`+.archlinux.org`/`+.github.com`/`+.githubusercontent.com`/`+.jsdelivr.net`/`raw.githubusercontent.com` → DNS через PROXY.
 - [x] `tun.exclude-package: [526 пакетов]` — нативное Android-исключение (эквивалент системной галке «Запретить выбранные приложения»).
-- [x] `RULE-SET,ru_apps,DIRECT` (legiz) + `RULE-SET,ru_apps_custom,DIRECT` (свой) — запасной способ для десктопа и приложений не из exclude.
+- [x] `RULE-SET,ru_apps,DIRECT` (legiz, уже в `master`) — запасной process-name fallback для десктопа и приложений не из exclude.
 - [x] Правило Telegram: `PROCESS-NAME-REGEX,(?i).*telegram.*` поднят в одно правило с `telegram-ips/domains` (лечит redmi/mido, где домен не резолвится через `fake-ip`).
 - [x] AI-правило: убран дубль (было два одинаковых правила).
 - [x] `tun.route-exclude-address` — убран `198.18.0.0/15` (ломает fake-ip, при redir-host не нужен).
@@ -35,7 +34,6 @@
 ### Что не сделано (этап 2, после зелёного теста)
 
 - [ ] Перенести изменения в `src/build.js` (отдельный коммит в dev).
-- [ ] `RULE-SET,ru_apps_custom,DIRECT` в `rule-providers` (опционально, если захостишь `data/ru-apps-classical.yaml`).
 - [ ] Поддержка `tun.exclude-package` для кастомного списка в `custom.yaml` (override per user).
 - [ ] Тест на 2-3 юзерах (через новую подписку).
 - [ ] Merge в `master` + рассылка обновления.
