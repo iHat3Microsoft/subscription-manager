@@ -1,5 +1,13 @@
 node_modules/
-data/
-public/
+# Test artifacts (dev branch only) — track these even though parents are ignored
+!data/ru-packages.txt
+!public/configs/test-config.yaml
+!public/configs/test-config.README.md
+!public/configs/_source/
+# Users: keep their key/config dirs private; only generated outputs are exposed
+data/*/ru/
+data/*/foreign/
+data/*/custom.yaml
+data/*/token.txt
 .env
 .DS_Store
