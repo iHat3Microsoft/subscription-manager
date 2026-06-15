@@ -1,11 +1,12 @@
 #!/usr/bin/env node
 // Test config generator for mihomo — run without proxy-providers.
 // Reads ru-app-list.yaml from legiz, dedupes packages, emits:
-//   - public/configs/test-config.yaml     (full mihomo config, no proxy-providers)
-//   - data/ru-packages.txt                (deduped list, for review)
+//   - /tmp/opencode/test-config/test-config.yaml  (full mihomo config, no proxy-providers)
+//   - data/ru-packages.txt                       (deduped package list, for review)
+//   - data/ru-apps-classical.yaml                (rule-provider format PROCESS-NAME,xxx — for hosting)
 //
-// Run: node test-config.builder.js
-// After: open public/configs/test-config.yaml, manually add your `proxies:` block.
+// Run: node src/test-config.builder.js
+// After: open /tmp/opencode/test-config/test-config.yaml, manually add your `proxies:` block.
 
 const fs = require('fs');
 const path = require('path');
@@ -14,9 +15,9 @@ const yaml = require('js-yaml');
 const ROOT = path.join(__dirname, '..');
 const RU_APP_LIST_URL = 'https://raw.githubusercontent.com/legiz-ru/mihomo-rule-sets/main/other/ru-app-list.yaml';
 const RU_APP_LIST_LOCAL = path.join(ROOT, 'public/configs/_source/ru-app-list.yaml');
-const OUT_CONFIG = path.join(ROOT, 'public/configs/test-config.yaml');
+const OUT_CONFIG = '/tmp/opencode/test-config/test-config.yaml';
 const OUT_PKG_LIST = path.join(ROOT, 'data/ru-packages.txt');
-const OUT_INDICATOR = path.join(ROOT, 'public/configs/test-config.README.md');
+const OUT_RULE_PROVIDER = path.join(ROOT, 'data/ru-apps-classical.yaml');
 
 function loadPackages() {
   let raw;
@@ -50,14 +51,16 @@ function buildConfig(packages) {
     'unified-delay': true,
     'tcp-concurrent': true,
 
-    // ---------- LightGBM (smart group) ----------
-    'lgbm-auto-update': true,
-    'lgbm-update-interval': 72,
-    'lgbm-url': 'https://github.com/vernesong/mihomo/releases/download/LightGBM-Model/Model-middle.bin',
+    // ---------- LightGBM/smart отключены (см. комментарий в DNS-секции) ----------
 
     profile: {
       'store-selected': true,
     },
+
+    // ---------- LightGBM/smart-группа отключены: ни у одного из целевых клиентов
+    // (mihomo for Android, FlClash, Clash Verge, NekoBox) нет поддержки type: smart
+    // в текущей стабильной версии. PR MetaCubeX/mihomo#2711 ещё не смёржен.
+    // Реальная автобалансировка делается через url-test (⚡️ Fastest) ниже. ----------
 
     // ---------- DNS (redir-host, через PROXY, fallback'и) ----------
     dns: {
@@ -142,21 +145,7 @@ function buildConfig(packages) {
 
     // ---------- Группы ----------
     'proxy-groups': [
-      // Smart (LightGBM) — основная «умная» группа иностранных
-      {
-        name: '📊 Smart',
-        type: 'smart',
-        hidden: true,
-        url: 'https://www.gstatic.com/generate_204',
-        interval: 300,
-        tolerance: 150,
-        uselightgbm: true,
-        collectdata: false,
-        strategy: 'sticky-sessions',
-        'sample-rate': 1,
-        use: ['foreign_servers']
-      },
-      // Url-test — запасной, если Smart/LightGBM сорвётся
+      // url-test — основная автобалансировка (выбирает прокси с мин. latency каждые 300с)
       {
         name: '⚡️ Fastest',
         type: 'url-test',
@@ -166,7 +155,7 @@ function buildConfig(packages) {
         tolerance: 150,
         use: ['foreign_servers']
       },
-      // Fallback (ленивый, без lgbm) — для стабильности
+      // Fallback (ленивый) — запасной, если все foreign отвалились или Fastest не выбрал никого
       {
         name: '♻️ Автовыбор (Иностранные)',
         type: 'fallback',
@@ -201,7 +190,7 @@ function buildConfig(packages) {
         name: '🌍 Иностранные серверы',
         type: 'select',
         icon: 'https://cdn.jsdelivr.net/gh/Koolson/Qure@master/IconSet/Color/Global.png',
-        proxies: ['📊 Smart', '⚡️ Fastest', '♻️ Автовыбор (Иностранные)', '🇷🇺 Российские серверы', 'DIRECT'],
+        proxies: ['⚡️ Fastest', '♻️ Автовыбор (Иностранные)', '🇷🇺 Российские серверы', 'DIRECT'],
         use: ['foreign_servers', 'ru_servers']
       },
       {
@@ -516,43 +505,15 @@ function main() {
   fs.writeFileSync(OUT_CONFIG, yaml.dump(config, { indent: 2, lineWidth: -1, noRefs: true }));
   console.log(`[ok] wrote ${OUT_CONFIG} (${(fs.statSync(OUT_CONFIG).size / 1024).toFixed(1)} KB)`);
 
-  // Краткая подсказка, чтобы не забыть вписать proxies руками
-  const readme = `# test-config.yaml (dev branch)
-
-Это **тестовый** конфиг mihomo. Сгенерирован из ru-app-list.yaml (legiz) с дедупликацией.
-Содержит:
-- DNS через PROXY (Quad9 → Cloudflare → Google)
-- redir-host (без fake-ip — лечит Telegram на redmi/mido/crDroid)
-- \`tun.exclude-package\` (${packages.length} пакетов) — нативное исключение как "Запретить выбранные приложения"
-- \`RULE-SET,ru_apps,DIRECT\` + process-name rules как запасной способ
-- 📊 Smart (LightGBM) + ⚡️ Fastest (url-test) — обе группы
-- \`PROCESS-NAME-REGEX,(?i).*telegram.*\` поднят на правило Telegram (лечит redmi/mido)
-- БЕЗ \`proxy-providers\` — впиши \`proxies:\` руками
-
-## Как тестировать
-
-1. Открой \`public/configs/test-config.yaml\`
-2. Впиши внизу (замени \`proxies: []\`) свои прокси, например:
-   \`\`\`yaml
-   proxies:
-     - name: "Мой AWG"
-       type: wireguard
-       server: 1.2.3.4
-       port: 51820
-       ip: 10.0.0.2
-       private-key: "..."
-       public-key: "..."
-       # ... и т.д.
-   \`\`\`
-3. Положи в mihomo-клиент (mihomo for Android / FlClash / Clash Verge / и т.п.)
-4. Если всё ок — переносим в \`src/build.js\`
-
-## Список пакетов
-
-См. \`data/ru-packages.txt\`.
-`;
-  fs.writeFileSync(OUT_INDICATOR, readme);
-  console.log(`[ok] wrote ${OUT_INDICATOR}`);
+  // Дополнительно: rule-provider формат (для подключения через URL)
+  // Можно захостить на GitHub Pages / сервере и подключить как
+  //   - RULE-SET,ru_apps_custom,DIRECT
+  const ruleProviderPayload = {
+    payload: packages.map(p => `PROCESS-NAME,${p}`)
+  };
+  fs.mkdirSync(path.dirname(OUT_RULE_PROVIDER), { recursive: true });
+  fs.writeFileSync(OUT_RULE_PROVIDER, yaml.dump(ruleProviderPayload, { indent: 2, lineWidth: -1 }));
+  console.log(`[ok] wrote ${OUT_RULE_PROVIDER} (${packages.length} PROCESS-NAME rules)`);
 }
 
 main();
