@@ -14,22 +14,23 @@ const yaml = require('js-yaml');
 
 const ROOT = path.join(__dirname, '..');
 const RU_APP_LIST_URL = 'https://raw.githubusercontent.com/legiz-ru/mihomo-rule-sets/main/other/ru-app-list.yaml';
-const RU_APP_LIST_LOCAL = path.join(ROOT, 'public/configs/_source/ru-app-list.yaml');
+// Кэш в /tmp — в репо не пишем, после `git clone` скачается заново при первом запуске
+const RU_APP_LIST_CACHE = '/tmp/opencode/ru-app-list.yaml';
 const OUT_CONFIG = '/tmp/opencode/test-config/test-config.yaml';
 const OUT_PKG_LIST = path.join(ROOT, 'data/ru-packages.txt');
 const OUT_RULE_PROVIDER = path.join(ROOT, 'data/ru-apps-classical.yaml');
 
 function loadPackages() {
   let raw;
-  if (fs.existsSync(RU_APP_LIST_LOCAL)) {
-    raw = fs.readFileSync(RU_APP_LIST_LOCAL, 'utf8');
-    console.log('[info] using local ru-app-list.yaml');
+  if (fs.existsSync(RU_APP_LIST_CACHE)) {
+    raw = fs.readFileSync(RU_APP_LIST_CACHE, 'utf8');
+    console.log(`[info] using cache ${RU_APP_LIST_CACHE}`);
   } else {
-    console.log('[info] downloading ru-app-list.yaml from legiz ...');
+    console.log(`[info] downloading ru-app-list.yaml from ${RU_APP_LIST_URL} ...`);
     const { execSync } = require('child_process');
-    fs.mkdirSync(path.dirname(RU_APP_LIST_LOCAL), { recursive: true });
-    execSync(`curl -fsSL "${RU_APP_LIST_URL}" -o "${RU_APP_LIST_LOCAL}"`);
-    raw = fs.readFileSync(RU_APP_LIST_LOCAL, 'utf8');
+    fs.mkdirSync(path.dirname(RU_APP_LIST_CACHE), { recursive: true });
+    execSync(`curl -fsSL "${RU_APP_LIST_URL}" -o "${RU_APP_LIST_CACHE}"`);
+    raw = fs.readFileSync(RU_APP_LIST_CACHE, 'utf8');
   }
   const parsed = yaml.load(raw);
   const pkgs = [];
