@@ -17,6 +17,31 @@ if (!fs.existsSync(CONFIGS_DIR)) fs.mkdirSync(CONFIGS_DIR, { recursive: true });
 // Environment or default base URL for providers
 const BASE_URL = process.env.BASE_URL || 'https://sub.k3k.lol';
 
+// Кэш списка RU-пакетов (legiz) — чтобы не качать при каждом билде
+// Список маленький (~20 KB), кладём рядом с data/, но в .gitignore
+const RU_APP_LIST_URL = 'https://raw.githubusercontent.com/legiz-ru/mihomo-rule-sets/main/other/ru-app-list.yaml';
+const RU_APP_LIST_CACHE = path.join(DATA_DIR, '.ru-app-list.yaml');
+
+function loadRuPackages() {
+  let raw;
+  if (fs.existsSync(RU_APP_LIST_CACHE)) {
+    raw = fs.readFileSync(RU_APP_LIST_CACHE, 'utf8');
+  } else {
+    console.log('[info] downloading ru-app-list.yaml from legiz ...');
+    const { execSync } = require('child_process');
+    fs.mkdirSync(path.dirname(RU_APP_LIST_CACHE), { recursive: true });
+    execSync(`curl -fsSL "${RU_APP_LIST_URL}" -o "${RU_APP_LIST_CACHE}"`);
+    raw = fs.readFileSync(RU_APP_LIST_CACHE, 'utf8');
+  }
+  const parsed = yaml.load(raw);
+  const pkgs = [];
+  for (const line of (parsed && parsed.payload) || []) {
+    const m = /^PROCESS-NAME,(.+)$/.exec(line);
+    if (m) pkgs.push(m[1]);
+  }
+  return [...new Set(pkgs)].sort();
+}
+
 // Helper to parse a single text chunk (file content)
 async function parseProxy(content) {
   content = content.trim();
@@ -63,7 +88,7 @@ async function parseProxy(content) {
 }
 
 // Generate the complete Mihomo config template for a user
-function generateConfig(userName, ruProviderUrl, foreignProviderUrl) {
+function generateConfig(userName, ruProviderUrl, foreignProviderUrl, excludePackages = []) {
   return {
     mode: 'rule',
     ipv6: false,
@@ -86,7 +111,7 @@ function generateConfig(userName, ruProviderUrl, foreignProviderUrl) {
         '+.telegram.org',
         '+.t.me'
       ],
-      'default-nameserver': ['8.8.8.8', '1.1.1.1'],
+      'default-nameserver': ['8.8.8.8', '1.1.1.1', '9.9.9.9'],
       nameserver: [
         'https://8.8.8.8/dns-query',
         'https://cloudflare-dns.com/dns-query'
@@ -108,7 +133,8 @@ function generateConfig(userName, ruProviderUrl, foreignProviderUrl) {
         '169.254.0.0/16', '172.16.0.0/12', '192.0.0.0/24', '192.0.2.0/24',
         '192.88.99.0/24', '192.168.0.0/16', '198.51.100.0/24', '203.0.113.0/24',
         '224.0.0.0/3', '::/127', 'fc00::/7', 'fe80::/10', 'ff00::/8'
-      ]
+      ],
+      'exclude-package': excludePackages
     },
 
     sniffer: {
@@ -600,6 +626,16 @@ async function buildAll() {
     return;
   }
 
+  // Загружаем список RU-пакетов (legiz) один раз для всех юзеров
+  let ruPackages = [];
+  try {
+    ruPackages = loadRuPackages();
+    console.log(`[info] loaded ${ruPackages.length} RU package(s) for tun.exclude-package`);
+  } catch (e) {
+    console.error(`[warn] failed to load RU packages: ${e.message}`);
+    console.error(`[warn] continuing without tun.exclude-package`);
+  }
+
   const users = fs.readdirSync(DATA_DIR).filter(f => fs.statSync(path.join(DATA_DIR, f)).isDirectory());
 
   for (const user of users) {
@@ -702,7 +738,8 @@ async function buildAll() {
     const masterConfig = generateConfig(
       user,
       `${BASE_URL}/providers/${token}_ru.yaml`,
-      `${BASE_URL}/providers/${token}_foreign.yaml`
+      `${BASE_URL}/providers/${token}_foreign.yaml`,
+      ruPackages
     );
 
     // Вшиваем имя профиля прямо в YAML (поддерживается многими клиентами)
@@ -728,6 +765,10 @@ async function buildAll() {
             } else if (key === 'rules' && Array.isArray(customConfig[key])) {
               // Добавляем кастомные правила в САМОЕ НАЧАЛО
               masterConfig.rules = [...customConfig[key], ...masterConfig.rules];
+            } else if (key === 'tun-exclude-packages' && Array.isArray(customConfig[key])) {
+              // Override списка исключённых Android-пакетов (tun.exclude-package)
+              if (!masterConfig.tun) masterConfig.tun = {};
+              masterConfig.tun['exclude-package'] = customConfig[key];
             } else {
               // Перезаписываем или добавляем другие ключи (external-ui, secret и т.д.)
               masterConfig[key] = customConfig[key];
