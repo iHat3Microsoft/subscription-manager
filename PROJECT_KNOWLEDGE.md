@@ -53,6 +53,26 @@ header /configs/* Subscription-Userinfo "upload=0; download=0; total=10995116277
 2. **Настоящий биллинг / Revoke ключей:**
    Переход на `awg-server` (тот самый бинарник на Go) или Marzban. Текущий менеджер подписок **не умеет** блокировать доступ к самому серверу VPN. Он лишь генерирует файл для телефона. Реально ограничить гигабайты и заблокировать пользователя можно только на самом VPN-сервере.
 3. **Авто-деплой через GitHub Actions:**
-    Настроить CI/CD, чтобы вы могли закидывать `.conf` файлы прямо на GitHub со своего ПК, а сервер сам бы стягивал их, запускал `build.js` и обновлял Caddy.
+   Настроить CI/CD, чтобы вы могли закидывать `.conf` файлы прямо на GitHub со своего ПК, а сервер сам бы стягивал их, запускал `build.js` и обновлял Caddy.
 4. **TODO (без срочности):**
-    Доделать безопасный деплой-пользователь `deploy-bot` (forced command в `authorized_keys`, минимальные права) и включить workflow после проверки ключей.
+   Доделать безопасный деплой-пользователь `deploy-bot` (forced command в `authorized_keys`, минимальные права) и включить workflow после проверки ключей.
+
+## v0.2-minimal (готов к merge в master) — 82d936c
+
+Минимальные правки от `f1acddf` (свежий `origin/master`). Что добавили (3 точки):
+
+- **`tun.exclude-package: [526 RU пакетов]`** — legiz-список (Сбер, ВК, Авито, Яндекс, Озон, Wildberries, банки, операторы и т.д.). На Android — нативно (пакеты не идут в TUN → приложения не ругаются). Список кэшируется в `data/.ru-app-list.yaml` (под `.gitignore`), скачивается с legiz при первом `node src/build.js`.
+- **`default-nameserver: [8.8.8.8, 1.1.1.1, 9.9.9.9]`** — Quad9 в конец как запасной DNS.
+- **`custom.yaml: tun-exclude-packages: [pkg1, pkg2]`** — per-user override (если юзер хочет свой короткий список вместо дефолтных 526).
+
+Что **не** трогали (уже было в master, не дублировали):
+- AI-правило (`🤖 AI`) — одиночное, дубля нет.
+- Google-селектор (`🔎 Google`) — из `fd7d3b7`.
+- Roblox убран, Steam/DIRECT, Discord/YouTube с DIRECT — твои коммиты.
+
+Что **не** вошло (dev-эксперименты, не доказано):
+- `type: smart` / `uselightgbm` — нет в mihomo for Android / FlClash / Clash Verge / NekoBox. PR #2711 open.
+- Telegram-процесс-нейм (redmi/mido fix) — не доказано.
+- DNS через PROXY (`respect-rules`, `nameserver-policy` для archlinux/omarchy) — не доказано.
+
+Подробности в `TODO.md`. Тестовая ветка — `v0.2-minimal` (от `master`).
