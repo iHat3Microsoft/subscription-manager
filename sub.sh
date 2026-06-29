@@ -245,4 +245,4 @@ echo "[*] Running build command on $NETHER_HOST..."
 echo "    cd $DATA_DIR && $BUILD_CMD"
 echo
 
-ssh -tt "$NETHER_HOST" "cd $(sq "$DATA_DIR") && $BUILD_CMD"
+ssh -tt "$NETHER_HOST" "bash -ic $(sq "cd $(sq "$DATA_DIR") && $BUILD_CMD")"
