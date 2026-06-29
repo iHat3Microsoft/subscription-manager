@@ -8,6 +8,7 @@ BUILD_CMD="${BUILD_CMD:-buildvpn}"
 
 DRY_RUN=0
 SKIP_BUILD=0
+REUSE_LOCAL=0
 REMOTE_FILENAME=""
 
 usage() {
@@ -27,6 +28,7 @@ Options:
   --gen-script PATH    Local generator script, default: ./gen.sh
   --build-cmd CMD      Remote build command, default: buildvpn
   --skip-build         Do not run buildvpn after upload
+  --reuse-local        Skip gen.sh, reuse already-generated ./out_keys/<server>/*.conf
   --dry-run            Only show what would be done
   -h, --help           Show help
 EOF
@@ -56,6 +58,10 @@ while [[ $# -gt 0 ]]; do
             ;;
         --skip-build)
             SKIP_BUILD=1
+            shift
+            ;;
+        --reuse-local)
+            REUSE_LOCAL=1
             shift
             ;;
         --dry-run)
@@ -164,29 +170,48 @@ if [[ "${#EXISTING_REMOTE[@]}" -gt 0 ]]; then
 fi
 
 LOCAL_OUT_DIR="./out_keys/$VPN_SERVER"
-EXISTING_LOCAL=()
 
-for u in "${USERS[@]}"; do
-    [[ -e "$LOCAL_OUT_DIR/$u.conf" ]] && EXISTING_LOCAL+=("$LOCAL_OUT_DIR/$u.conf")
-    [[ -e "$LOCAL_OUT_DIR/$u.info" ]] && EXISTING_LOCAL+=("$LOCAL_OUT_DIR/$u.info")
-done
+if [[ "$REUSE_LOCAL" -eq 1 ]]; then
+    MISSING_LOCAL=()
+    for u in "${USERS[@]}"; do
+        [[ ! -e "$LOCAL_OUT_DIR/$u.conf" || ! -e "$LOCAL_OUT_DIR/$u.info" ]] && MISSING_LOCAL+=("$u")
+    done
 
-if [[ "${#EXISTING_LOCAL[@]}" -gt 0 ]]; then
-    echo "[!] Abort: local generated files already exist, refusing to continue:"
-    printf '    %s\n' "${EXISTING_LOCAL[@]}"
-    echo
-    echo "    Move/remove old files or use a clean output directory for gen.sh."
-    exit 1
+    if [[ "${#MISSING_LOCAL[@]}" -gt 0 ]]; then
+        echo "[!] --reuse-local: missing local generated files for:"
+        printf '    %s\n' "${MISSING_LOCAL[@]}"
+        echo "    Need both <user>.conf and <user>.info in $LOCAL_OUT_DIR"
+        echo "    Run without --reuse-local to regenerate, or supply missing files."
+        exit 1
+    fi
+else
+    EXISTING_LOCAL=()
+    for u in "${USERS[@]}"; do
+        [[ -e "$LOCAL_OUT_DIR/$u.conf" ]] && EXISTING_LOCAL+=("$LOCAL_OUT_DIR/$u.conf")
+        [[ -e "$LOCAL_OUT_DIR/$u.info" ]] && EXISTING_LOCAL+=("$LOCAL_OUT_DIR/$u.info")
+    done
+
+    if [[ "${#EXISTING_LOCAL[@]}" -gt 0 ]]; then
+        echo "[!] Abort: local generated files already exist, refusing to continue:"
+        printf '    %s\n' "${EXISTING_LOCAL[@]}"
+        echo
+        echo "    Move/remove old files or use a clean output directory for gen.sh."
+        exit 1
+    fi
 fi
 
 echo "[*] Preflight OK"
 echo
 
 if [[ "$DRY_RUN" -eq 1 ]]; then
-    echo "[DRY-RUN] Would run:"
-    printf '    bash %q %q' "$GEN_SCRIPT" "$VPN_SERVER"
-    printf ' %q' "${USERS[@]}"
-    echo
+    if [[ "$REUSE_LOCAL" -eq 1 ]]; then
+        echo "[DRY-RUN] Reusing existing local configs (skipping $GEN_SCRIPT)"
+    else
+        echo "[DRY-RUN] Would run:"
+        printf '    bash %q %q' "$GEN_SCRIPT" "$VPN_SERVER"
+        printf ' %q' "${USERS[@]}"
+        echo
+    fi
     echo
     echo "[DRY-RUN] Would upload:"
     for u in "${USERS[@]}"; do
@@ -200,8 +225,12 @@ if [[ "$DRY_RUN" -eq 1 ]]; then
     exit 0
 fi
 
-echo "[*] Generating VPN configs with $GEN_SCRIPT..."
-bash "$GEN_SCRIPT" "$VPN_SERVER" "${USERS[@]}"
+if [[ "$REUSE_LOCAL" -eq 1 ]]; then
+    echo "[*] Reusing existing local configs in $LOCAL_OUT_DIR (skipping $GEN_SCRIPT)"
+else
+    echo "[*] Generating VPN configs with $GEN_SCRIPT..."
+    bash "$GEN_SCRIPT" "$VPN_SERVER" "${USERS[@]}"
+fi
 
 echo
 echo "[*] Checking generated configs..."
