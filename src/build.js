@@ -155,7 +155,7 @@ function generateConfig(userName, ruProviderUrl, foreignProviderUrl, excludePack
         path: './proxy-providers/ru_servers.yaml',
         'health-check': {
           enable: true,
-          interval: 600,
+          interval: 180,
           url: 'https://www.gstatic.com/generate_204'
         }
       },
@@ -166,7 +166,7 @@ function generateConfig(userName, ruProviderUrl, foreignProviderUrl, excludePack
         path: './proxy-providers/foreign_servers.yaml',
         'health-check': {
           enable: true,
-          interval: 600,
+          interval: 180,
           url: 'https://www.gstatic.com/generate_204'
         }
       }
