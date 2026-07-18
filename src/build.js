@@ -179,7 +179,7 @@ function generateConfig(userName, ruProviderUrl, foreignProviderUrl, excludePack
         hidden: true,
         url: 'https://www.gstatic.com/generate_204',
         interval: 300,
-        timeout: 5000,
+        timeout: 2500,
         lazy: true,
         use: ['foreign_servers']
       },
@@ -189,7 +189,7 @@ function generateConfig(userName, ruProviderUrl, foreignProviderUrl, excludePack
         hidden: true,
         url: 'https://www.gstatic.com/generate_204',
         interval: 300,
-        timeout: 5000,
+        timeout: 2500,
         lazy: true,
         use: ['ru_servers']
       },
@@ -199,7 +199,7 @@ function generateConfig(userName, ruProviderUrl, foreignProviderUrl, excludePack
         hidden: true,
         url: 'https://www.gstatic.com/generate_204',
         interval: 300,
-        timeout: 5000,
+        timeout: 2500,
         lazy: true,
         use: ['ru_servers', 'foreign_servers']
       },
