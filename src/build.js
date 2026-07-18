@@ -275,13 +275,6 @@ function generateConfig(userName, ruProviderUrl, foreignProviderUrl, excludePack
         use: ['foreign_servers', 'ru_servers']
       },
       {
-        name: '🔎 Google',
-        type: 'select',
-        icon: 'https://cdn.jsdelivr.net/gh/Koolson/Qure@master/IconSet/Color/Google_Search.png',
-        proxies: ['DIRECT', '🌍 Иностранные серверы', '🇷🇺 Российские серверы'],
-        use: ['foreign_servers', 'ru_servers']
-      },
-      {
         name: '🎵 TikTok',
         type: 'select',
         icon: 'https://cdn.jsdelivr.net/gh/Koolson/Qure@master/IconSet/Color/TikTok.png',
@@ -300,13 +293,6 @@ function generateConfig(userName, ruProviderUrl, foreignProviderUrl, excludePack
         type: 'select',
         icon: 'https://cdn.jsdelivr.net/gh/Koolson/Qure@master/IconSet/Color/Game.png',
         proxies: ['🌍 Иностранные серверы', '🇷🇺 Российские серверы'],
-        use: ['foreign_servers', 'ru_servers']
-      },
-      {
-        name: '🎮 Steam',
-        type: 'select',
-        icon: 'https://cdn.jsdelivr.net/gh/Koolson/Qure@master/IconSet/Color/Game.png',
-        proxies: ['DIRECT', '🌍 Иностранные серверы', '🇷🇺 Российские серверы'],
         use: ['foreign_servers', 'ru_servers']
       },
       {
@@ -445,22 +431,6 @@ function generateConfig(userName, ruProviderUrl, foreignProviderUrl, excludePack
         path: './rule-sets/telegram-ips.mrs',
         interval: 86400
       },
-      'geosite-google': {
-        behavior: 'domain',
-        type: 'http',
-        format: 'mrs',
-        url: 'https://github.com/MetaCubeX/meta-rules-dat/raw/meta/geo/geosite/google.mrs',
-        path: './rule-sets/google.mrs',
-        interval: 86400
-      },
-      'google-geoip': {
-        behavior: 'ipcidr',
-        type: 'http',
-        format: 'mrs',
-        url: 'https://github.com/MetaCubeX/meta-rules-dat/raw/meta/geo/geoip/google.mrs',
-        path: './rule-sets/google-geoip.mrs',
-        interval: 86400
-      },
       'geosite-openai': {
         behavior: 'domain',
         type: 'http',
@@ -549,14 +519,6 @@ function generateConfig(userName, ruProviderUrl, foreignProviderUrl, excludePack
         path: './rule-sets/games-direct.yaml',
         interval: 86400
       },
-      steam: {
-        type: 'http',
-        behavior: 'domain',
-        format: 'mrs',
-        interval: 86400,
-        url: 'https://raw.githubusercontent.com/MetaCubeX/meta-rules-dat/meta/geo/geosite/steam.mrs',
-        path: './rule-sets/steam.mrs'
-      },
       'discord_vc': {
         type: 'inline',
         behavior: 'classical',
@@ -576,7 +538,6 @@ function generateConfig(userName, ruProviderUrl, foreignProviderUrl, excludePack
 
     rules: [
       'RULE-SET,oisd_big,🚫 Реклама',
-      'RULE-SET,steam,🎮 Steam',
       'RULE-SET,games-direct,🎮 Игры (DIRECT)',
       'RULE-SET,torrent-clients,DIRECT',
       'PROCESS-NAME-REGEX,(?i).*torrent.*,DIRECT',
@@ -604,7 +565,6 @@ function generateConfig(userName, ruProviderUrl, foreignProviderUrl, excludePack
       'RULE-SET,geosite-tiktok,🎵 TikTok',
       'RULE-SET,geosite-soundcloud,🌍 Иностранные серверы',
       'OR,((RULE-SET,geosite-openai),(RULE-SET,google-gemini),(RULE-SET,geosite-anthropic),(DOMAIN-KEYWORD,grok),(DOMAIN-SUFFIX,grok.com),(DOMAIN-SUFFIX,appcenter.ms),(DOMAIN-KEYWORD,copilot),(DOMAIN-SUFFIX,copilot.microsoft.com),(PROCESS-NAME-REGEX,(?i).*(chatgpt|claude|copilot|gemini|cursor|windsurf|cline|antigravity|opencode).*),(PROCESS-NAME,opencode),(PROCESS-NAME,com.openai.chatgpt),(PROCESS-NAME,com.anthropic.claude),(PROCESS-NAME,com.microsoft.copilot),(PROCESS-NAME,ai.perplexity.app.android)),🤖 AI (Нейронки)',
-      'OR,((RULE-SET,google-geoip),(RULE-SET,geosite-google)),🔎 Google',
       'RULE-SET,geosite-supercell,👾 Brawl Stars',
       'RULE-SET,ru-blocked,🚫 Заблокированные сайты (RU)',
       'RULE-SET,category-porn,🔞 18+',
