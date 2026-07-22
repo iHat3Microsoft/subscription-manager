@@ -175,34 +175,34 @@ function generateConfig(userName, ruProviderUrl, foreignProviderUrl, excludePack
     'proxy-groups': [
       {
         name: '♻️ Автовыбор (Иностранные)',
-        type: 'fallback',
+        type: 'url-test',
         hidden: true,
         url: 'https://www.gstatic.com/generate_204',
         interval: 180,
         timeout: 5000,
-        'max-failed-times': 3,
+        tolerance: 150,
         lazy: true,
         use: ['foreign_servers']
       },
       {
         name: '♻️ Автовыбор (Россия)',
-        type: 'fallback',
+        type: 'url-test',
         hidden: true,
         url: 'https://www.gstatic.com/generate_204',
         interval: 180,
         timeout: 5000,
-        'max-failed-times': 3,
+        tolerance: 150,
         lazy: true,
         use: ['ru_servers']
       },
       {
         name: '♻️ Резерв (RU -> EU)',
-        type: 'fallback',
+        type: 'url-test',
         hidden: true,
         url: 'https://www.gstatic.com/generate_204',
         interval: 180,
         timeout: 5000,
-        'max-failed-times': 3,
+        tolerance: 150,
         lazy: true,
         use: ['ru_servers', 'foreign_servers']
       },
