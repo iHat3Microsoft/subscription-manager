@@ -95,7 +95,7 @@ function generateConfig(userName, ruProviderUrl, foreignProviderUrl, excludePack
     'log-level': 'info',
     'allow-lan': false,
     'unified-delay': true,
-    'tcp-concurrent': false,
+    'tcp-concurrent': true,
 
     dns: {
       enable: true,
@@ -154,7 +154,7 @@ function generateConfig(userName, ruProviderUrl, foreignProviderUrl, excludePack
         url: ruProviderUrl,
         path: './proxy-providers/ru_servers.yaml',
         'health-check': {
-          enable: false,
+          enable: true,
           interval: 600,
           url: 'https://www.gstatic.com/generate_204'
         }
@@ -165,7 +165,7 @@ function generateConfig(userName, ruProviderUrl, foreignProviderUrl, excludePack
         url: foreignProviderUrl,
         path: './proxy-providers/foreign_servers.yaml',
         'health-check': {
-          enable: false,
+          enable: true,
           interval: 600,
           url: 'https://www.gstatic.com/generate_204'
         }
@@ -178,10 +178,9 @@ function generateConfig(userName, ruProviderUrl, foreignProviderUrl, excludePack
         type: 'fallback',
         hidden: true,
         url: 'https://www.gstatic.com/generate_204',
-        interval: 180,
-        timeout: 10000,
-        'max-failed-times': 1,
-        lazy: true,
+        interval: 60,
+        timeout: 5000,
+        'max-failed-times': 3,
         use: ['foreign_servers']
       },
       {
@@ -189,10 +188,9 @@ function generateConfig(userName, ruProviderUrl, foreignProviderUrl, excludePack
         type: 'fallback',
         hidden: true,
         url: 'https://www.gstatic.com/generate_204',
-        interval: 180,
-        timeout: 10000,
-        'max-failed-times': 1,
-        lazy: true,
+        interval: 60,
+        timeout: 5000,
+        'max-failed-times': 3,
         use: ['ru_servers']
       },
       {
@@ -200,10 +198,9 @@ function generateConfig(userName, ruProviderUrl, foreignProviderUrl, excludePack
         type: 'fallback',
         hidden: true,
         url: 'https://www.gstatic.com/generate_204',
-        interval: 180,
-        timeout: 10000,
-        'max-failed-times': 1,
-        lazy: true,
+        interval: 60,
+        timeout: 5000,
+        'max-failed-times': 3,
         use: ['ru_servers', 'foreign_servers']
       },
       {
