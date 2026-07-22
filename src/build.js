@@ -155,7 +155,7 @@ function generateConfig(userName, ruProviderUrl, foreignProviderUrl, excludePack
         path: './proxy-providers/ru_servers.yaml',
         'health-check': {
           enable: true,
-          interval: 180,
+          interval: 600,
           url: 'https://www.gstatic.com/generate_204'
         }
       },
@@ -166,7 +166,7 @@ function generateConfig(userName, ruProviderUrl, foreignProviderUrl, excludePack
         path: './proxy-providers/foreign_servers.yaml',
         'health-check': {
           enable: true,
-          interval: 180,
+          interval: 600,
           url: 'https://www.gstatic.com/generate_204'
         }
       }
@@ -179,7 +179,7 @@ function generateConfig(userName, ruProviderUrl, foreignProviderUrl, excludePack
         hidden: true,
         url: 'https://www.gstatic.com/generate_204',
         interval: 300,
-        timeout: 2500,
+        timeout: 5000,
         lazy: true,
         use: ['foreign_servers']
       },
@@ -189,7 +189,7 @@ function generateConfig(userName, ruProviderUrl, foreignProviderUrl, excludePack
         hidden: true,
         url: 'https://www.gstatic.com/generate_204',
         interval: 300,
-        timeout: 2500,
+        timeout: 5000,
         lazy: true,
         use: ['ru_servers']
       },
@@ -199,7 +199,7 @@ function generateConfig(userName, ruProviderUrl, foreignProviderUrl, excludePack
         hidden: true,
         url: 'https://www.gstatic.com/generate_204',
         interval: 300,
-        timeout: 2500,
+        timeout: 5000,
         lazy: true,
         use: ['ru_servers', 'foreign_servers']
       },
