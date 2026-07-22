@@ -801,6 +801,14 @@ function parseAmneziaWireGuardBaseProxy(serverConfig, protocolConfig, clientConf
   const mtu = toIntMaybe(clientConfig.mtu);
   if (mtu !== null) proxy.mtu = mtu;
 
+  let pka = toIntMaybe(clientConfig.persistent_keepalive);
+  if (pka === null) {
+    const cfgText = String(clientConfig.config || '');
+    const mPka = cfgText.match(/^\s*PersistentKeepalive\s*=\s*(\d+)/im);
+    if (mPka && mPka[1]) pka = +mPka[1];
+  }
+  if (pka !== null && pka > 0) proxy['persistent-keepalive'] = pka;
+
   const dns1 = String(serverConfig.dns1 || '').trim();
   if (dns1) {
     setWireGuardDns(proxy, dns1);
@@ -987,6 +995,8 @@ function parseWireGuardConfig(text) {
   if (mtu !== null) proxy.mtu = mtu;
   const psk = getAwgKey(peer, 'PresharedKey');
   if (psk) proxy['pre-shared-key'] = psk;
+  const pka = toIntMaybe(getAwgKey(peer, 'PersistentKeepalive'));
+  if (pka !== null && pka > 0) proxy['persistent-keepalive'] = pka;
   const dns = getAwgKey(iface, 'DNS');
   if (dns) setWireGuardDns(proxy, dns.split(',')[0].trim());
   if (isAmnezia) {
