@@ -97,11 +97,6 @@ function generateConfig(userName, ruProviderUrl, foreignProviderUrl, excludePack
     'unified-delay': true,
     'tcp-concurrent': true,
 
-    profile: {
-      'store-selected': true,
-      'store-fake-ip': true
-    },
-
     dns: {
       enable: true,
       listen: '127.0.0.1:6868',
