@@ -95,7 +95,7 @@ function generateConfig(userName, ruProviderUrl, foreignProviderUrl, excludePack
     'log-level': 'info',
     'allow-lan': false,
     'unified-delay': true,
-    'tcp-concurrent': true,
+    'tcp-concurrent': false,
 
     dns: {
       enable: true,
@@ -154,7 +154,7 @@ function generateConfig(userName, ruProviderUrl, foreignProviderUrl, excludePack
         url: ruProviderUrl,
         path: './proxy-providers/ru_servers.yaml',
         'health-check': {
-          enable: true,
+          enable: false,
           interval: 600,
           url: 'https://www.gstatic.com/generate_204'
         }
@@ -165,7 +165,7 @@ function generateConfig(userName, ruProviderUrl, foreignProviderUrl, excludePack
         url: foreignProviderUrl,
         path: './proxy-providers/foreign_servers.yaml',
         'health-check': {
-          enable: true,
+          enable: false,
           interval: 600,
           url: 'https://www.gstatic.com/generate_204'
         }
@@ -178,9 +178,10 @@ function generateConfig(userName, ruProviderUrl, foreignProviderUrl, excludePack
         type: 'fallback',
         hidden: true,
         url: 'https://www.gstatic.com/generate_204',
-        interval: 60,
+        interval: 180,
         timeout: 5000,
         'max-failed-times': 3,
+        lazy: true,
         use: ['foreign_servers']
       },
       {
@@ -188,9 +189,10 @@ function generateConfig(userName, ruProviderUrl, foreignProviderUrl, excludePack
         type: 'fallback',
         hidden: true,
         url: 'https://www.gstatic.com/generate_204',
-        interval: 60,
+        interval: 180,
         timeout: 5000,
         'max-failed-times': 3,
+        lazy: true,
         use: ['ru_servers']
       },
       {
@@ -198,9 +200,10 @@ function generateConfig(userName, ruProviderUrl, foreignProviderUrl, excludePack
         type: 'fallback',
         hidden: true,
         url: 'https://www.gstatic.com/generate_204',
-        interval: 60,
+        interval: 180,
         timeout: 5000,
         'max-failed-times': 3,
+        lazy: true,
         use: ['ru_servers', 'foreign_servers']
       },
       {
