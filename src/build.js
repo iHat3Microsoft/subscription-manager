@@ -178,9 +178,9 @@ function generateConfig(userName, ruProviderUrl, foreignProviderUrl, excludePack
         type: 'fallback',
         hidden: true,
         url: 'https://www.gstatic.com/generate_204',
-        interval: 300,
+        interval: 60,
         timeout: 5000,
-        lazy: true,
+        'max-failed-times': 3,
         use: ['foreign_servers']
       },
       {
@@ -188,9 +188,9 @@ function generateConfig(userName, ruProviderUrl, foreignProviderUrl, excludePack
         type: 'fallback',
         hidden: true,
         url: 'https://www.gstatic.com/generate_204',
-        interval: 300,
+        interval: 60,
         timeout: 5000,
-        lazy: true,
+        'max-failed-times': 3,
         use: ['ru_servers']
       },
       {
@@ -198,9 +198,9 @@ function generateConfig(userName, ruProviderUrl, foreignProviderUrl, excludePack
         type: 'fallback',
         hidden: true,
         url: 'https://www.gstatic.com/generate_204',
-        interval: 300,
+        interval: 60,
         timeout: 5000,
-        lazy: true,
+        'max-failed-times': 3,
         use: ['ru_servers', 'foreign_servers']
       },
       {
