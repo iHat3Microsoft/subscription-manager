@@ -729,6 +729,20 @@ async function buildAll() {
               // Override списка исключённых Android-пакетов (tun.exclude-package)
               if (!masterConfig.tun) masterConfig.tun = {};
               masterConfig.tun['exclude-package'] = customConfig[key];
+            } else if (key === 'rule-providers' && customConfig[key] && typeof customConfig[key] === 'object' && !Array.isArray(customConfig[key])) {
+              // Сливаем rule-providers по имени: существующие переопределяем частично,
+              // отсутствующие добавляем. Не затираем базовый набор (oisd_big, games-direct, ...).
+              if (!masterConfig['rule-providers'] || typeof masterConfig['rule-providers'] !== 'object') {
+                masterConfig['rule-providers'] = {};
+              }
+              for (const rpName of Object.keys(customConfig['rule-providers'])) {
+                const existing = masterConfig['rule-providers'][rpName];
+                if (existing && typeof existing === 'object') {
+                  Object.assign(existing, customConfig['rule-providers'][rpName]);
+                } else {
+                  masterConfig['rule-providers'][rpName] = customConfig['rule-providers'][rpName];
+                }
+              }
             } else {
               // Перезаписываем или добавляем другие ключи (external-ui, secret и т.д.)
               masterConfig[key] = customConfig[key];
