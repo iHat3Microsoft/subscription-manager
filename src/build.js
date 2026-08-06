@@ -68,11 +68,20 @@ async function parseProxy(content, baseName) {
     // Not JSON
   }
 
-  // Try HTTP subscription URL → proxy-provider (mihomo fetches it itself).
-  // Marzban subscription endpoint returns full Clash YAML when User-Agent
-  // is clash.meta, base64-vless otherwise. We force clash.meta so mihomo
-  // can parse the response as a proxy-provider file.
+  // Try HTTP subscription URL -> inline ingest of Marzban-style YAML.
+  // We fetch with User-Agent: clash.meta so the panel returns the full
+  // Clash YAML (mode/port/proxies/proxy-groups/rules), then extract
+  // proxies[] and return as a LIST so the caller treats each as its
+  // own proxy entry in the master provider file. This way admin
+  // adding a new inbound to Marzban shows up on the next `node build.js`
+  // without modifying any per-user State.
   if (/^https?:\/\//.test(content)) {
+    const fetched = await ingestHttpProxyList(content);
+    if (fetched && fetched.length > 0) {
+      return fetched;
+    }
+    // Falls back: if the URL turned out to be unreachable, leave a
+    // proxy-provider link so the end user can debug (mihomo will retry).
     const sub = parsers.parseSubscriptionUrl(content);
     if (sub) {
       sub.name = `sub-${baseName || 'unknown'}`;
@@ -98,6 +107,68 @@ async function parseProxy(content, baseName) {
   }
 
   return null;
+}
+
+// In-memory cache of <URL> -> parsed Marzban YAML body.
+// Lives only for one `node build.js` invocation: restarting the
+// script re-fetches. Same URL seen again across multiple users in the
+// same run -> fetched once.
+const _urlCache = new Map();
+
+async function ingestHttpProxyList(url) {
+  let body = _urlCache.get(url);
+  if (body === undefined) {
+    try {
+      const { execFileSync } = require('child_process');
+      body = execFileSync(
+        'curl',
+        ['-fsS', '--max-time', '20', '-H', 'User-Agent: clash.meta', url],
+        { stdio: ['ignore', 'pipe', 'pipe'], encoding: 'utf8' }
+      );
+    } catch (e) {
+      console.error(`[!] could not fetch ${url}: ${e.message.split('\n')[0]}`);
+      body = null;
+    }
+    _urlCache.set(url, body);
+  }
+  if (!body) return null;
+  let doc;
+  try {
+    doc = yaml.load(body);
+  } catch (e) {
+    console.error(`[!] could not parse YAML from ${url}`);
+    return null;
+  }
+  if (!doc || !Array.isArray(doc.proxies) || doc.proxies.length === 0) {
+    return null;
+  }
+  return doc.proxies.map((p, i) => {
+    if (!p || typeof p !== 'object') return p;
+    if (!p.name) p.name = `proxied-${i + 1}`;
+    return p;
+  });
+}
+
+// parseProxy() may return either a single proxy object OR an Array of
+// proxies (when HTTP ingest expanded Marzban's proxies[]). Normalize
+// to always return Array; rename per caller-supplied baseName so the
+// final master provider file lists them as <baseName>[-N].
+function asProxyList(result, baseName) {
+  if (!result) return [];
+  const list = Array.isArray(result) ? result : [result];
+  return list
+    .filter(p => p && typeof p === 'object' && p.name)
+    .map((p, idx, arr) => {
+      // Keep Marzban-supplied names if present (they're already unique
+      // within one URL fetch); otherwise base-name them.
+      if (arr.length === 1) {
+        p.name = baseName;
+      } else if (!/^Marz|^🚀|^node-/.test(p.name || '')) {
+        // not a Marz node-named server; use base-N
+        p.name = `${baseName}-${idx + 1}`;
+      }
+      return p;
+    });
 }
 
 // Generate the complete Mihomo config template for a user
@@ -641,19 +712,16 @@ async function buildAll() {
         const baseName = f.replace(/\.[^/.]+$/, "");
 
         for (let i = 0; i < lines.length; i++) {
-          const proxy = await parseProxy(lines[i], baseName);
-          if (proxy) validProxies.push(proxy);
+          const result = await parseProxy(lines[i], baseName);
+          asProxyList(result, baseName).forEach(p => validProxies.push(p));
         }
 
         if (content.includes('[Interface]') || content.trim().startsWith('{')) {
-          const proxy = await parseProxy(content, baseName);
-          if (proxy) validProxies.push(proxy);
+          const result = await parseProxy(content, baseName);
+          asProxyList(result, baseName).forEach(p => validProxies.push(p));
         }
 
-        validProxies.forEach((p, idx) => {
-          p.name = validProxies.length === 1 ? baseName : `${baseName}-${idx + 1}`;
-          ruProxies.push(p);
-        });
+        validProxies.forEach(p => ruProxies.push(p));
       }
     }
 
@@ -663,24 +731,21 @@ async function buildAll() {
       for (const f of files) {
         const content = fs.readFileSync(path.join(foreignDir, f), 'utf-8');
         const lines = content.split('\n');
-        let validProxies = [];
+        const validProxies = [];
 
         const baseName = f.replace(/\.[^/.]+$/, "");
 
         for (let i = 0; i < lines.length; i++) {
-          const proxy = await parseProxy(lines[i], baseName);
-          if (proxy) validProxies.push(proxy);
+          const result = await parseProxy(lines[i], baseName);
+          asProxyList(result, baseName).forEach(p => validProxies.push(p));
         }
 
         if (content.includes('[Interface]') || content.trim().startsWith('{')) {
-          const proxy = await parseProxy(content, baseName);
-          if (proxy) validProxies.push(proxy);
+          const result = await parseProxy(content, baseName);
+          asProxyList(result, baseName).forEach(p => validProxies.push(p));
         }
 
-        validProxies.forEach((p, idx) => {
-          p.name = validProxies.length === 1 ? baseName : `${baseName}-${idx + 1}`;
-          foreignProxies.push(p);
-        });
+        validProxies.forEach(p => foreignProxies.push(p));
       }
     }
 
