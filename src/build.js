@@ -145,6 +145,7 @@ async function ingestHttpProxyList(url) {
   return doc.proxies.map((p, i) => {
     if (!p || typeof p !== 'object') return p;
     if (!p.name) p.name = `proxied-${i + 1}`;
+    Object.defineProperty(p, '_keepName', { value: true, enumerable: false });
     return p;
   });
 }
@@ -159,10 +160,9 @@ function asProxyList(result, baseName) {
   return list
     .filter(p => p && typeof p === 'object')
     .map((p, idx, arr) => {
-      // Marzban (and other) come with their own names already
-      // (e.g. "🚀 Marz (Vasya) [VLESS - tcp]"); leave them alone.
-      // Fill in only if the upstream parser dropped a name.
-      if (!p.name) {
+      if (!p._keepName) {
+        p.name = arr.length === 1 ? baseName : `${baseName}-${idx + 1}`;
+      } else if (!p.name) {
         p.name = arr.length === 1 ? baseName : `${baseName}-${idx + 1}`;
       }
       return p;
