@@ -131,7 +131,18 @@ if [[ -z "$SERVER_ALIAS" ]]; then
 fi
 
 if [[ -z "$SERVER_ALIAS" ]]; then
-    echo "[!] Server alias is required (or leave one subdir under $LOCAL_OUT_DIR_BASE, or pass --users so a matching subdir can be picked)." >&2
+    echo "[!] Server alias is required." >&2
+    if [[ -d "$LOCAL_OUT_DIR_BASE" ]]; then
+        echo "[!] Subdirs under $LOCAL_OUT_DIR_BASE:" >&2
+        for d in "$LOCAL_OUT_DIR_BASE"/*; do
+            [[ -d "$d" ]] || continue
+            cnt=$(find "$d" -maxdepth 1 -type f -name '*.vless' | wc -l)
+            printf '    %s -> %d .vless file(s)\n' "$(basename "$d")" "$cnt" >&2
+        done
+        if [[ -n "$USERS_OVERRIDE" ]]; then
+            echo "[!] Need --users list (?): no subdir had every requested user." >&2
+        fi
+    fi
     usage >&2
     exit 1
 fi
