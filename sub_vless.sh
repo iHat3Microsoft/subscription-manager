@@ -1,22 +1,23 @@
 #!/usr/bin/env bash
-# sub_vless.sh — сгенерить vless-ключи на всех юзеров subscription-manager'а
-# через Marzban API и разложить в data/<user>/foreign/<name>.txt.
+# sub_vless.sh — генерация vless-ключей через Marzban API для всех
+# локальных юзеров на subscription-manager'е. Зеркало gen.sh + sub.sh для vless.
 #
-# Просто запусти `sub_vless.sh` — он сам спросит что нужно:
-#   Panel URL (например https://mirror.uvx.lol)
-#   Admin username (sudoer)
-#   Admin password (ввод скрыт, либо из $MARZBAN_ADMIN_PASSWORD)
-#   Имя файла в foreign/ (по умолчанию Marzban.txt)
+# Просто запусти `sub_vless.sh` и ответь на 3-4 вопроса — оно сгенерит
+# ключи на каждого юзера, прочитав их с удалёнки ssh-ом.
 #
-# Опциональные ключи:
-#   --dry-run              ничего не менять, только показать план
-#   --skip-build           не запускать buildvpn после раскладки
-#   --shared-url URL       один URL для ВСЕХ юзеров (без API/ключей)
-#   --server-alias NAME    имя папки для out_keys/ (любое, дефолт: vless)
-#   --reuse-local          использовать уже готовые out_keys/<a>/<u>.vless
-#   --limit-gb N / --expire-days N
+# Алгоритм (на каждого юзера):
+#   1. SSH на nether -> data/<user>/  -> список папок-юзеров
+#   2. POST /api/admin/token          -> holder Bearer
+#   3. На каждого user:
+#        - GET  /api/user/<u>          (если уже есть — skip создание)
+#        - POST /api/user              (если нет    — создать)
+#        - GET  /api/user/<u>.links[] -> vless://-строки
+#   4. Save ./out_keys/<server>/<user>.vless
+#   5. Upload -> nether:data/<user>/foreign/<name>.txt
+#   6. ssh buildvpn
 #
-# Зависимости: bash, ssh, scp, jq, curl.
+# Зависимости: bash, ssh, jq, curl.
+
 set -euo pipefail
 
 SCRIPT_NAME=$(basename "$0")
@@ -24,69 +25,54 @@ SCRIPT_NAME=$(basename "$0")
 NETHER_HOST="${NETHER_HOST:-nether2}"
 DATA_DIR="${DATA_DIR:-/opt/subscription-manager/data}"
 BUILD_CMD="${BUILD_CMD:-buildvpn}"
-LOCAL_OUT_DIR="./out_keys"
-GEN_SCRIPT="${GEN_SCRIPT:-./gen_vless.sh}"
+OUT_DIR="${OUT_DIR:-./out_keys/vless}"
 REMOTE_FILENAME="${REMOTE_FILENAME:-Marzban.txt}"
-SERVER_ALIAS="${SERVER_ALIAS:-vless}"
-USERS_OVERRIDE=""
-
 DRY_RUN=0
-SKIP_BUILD=0
-REUSE_LOCAL=0
-SHARED_URL=""
+SKIP_BUILD=1   # default: do NOT run buildvpn (run --build to override)
 
-# gen_vless pass-throughs
-GEN_PANEL=""
-GEN_ADMIN=""
-GEN_PASSWORD_ENV="${MARZBAN_PASSWORD_ENV:-MARZBAN_ADMIN_PASSWORD}"
-GEN_INBOUND=""
-GEN_LIMIT_GB=0
-GEN_EXPIRE_DAYS=0
+PANEL=""
+ADMIN_USER=""
+INBOUND_TAG="VLESS TCP VISION REALITY"
+LIMIT_GB=0
+EXPIRE_DAYS=0
+RESET_STRATEGY="day"
+PASSWORD_ENV_NAME="MARZBAN_ADMIN_PASSWORD"
 
 have_tty() { [[ -t 0 ]]; }
 
 ask() {
-    # ask <varname> <prompt>
     local var="$1" msg="$2"
     if [[ -n "${!var:-}" ]]; then return 0; fi
     if ! have_tty; then
-        echo "[!] $msg (stdin not a TTY; pass via --${var,,} <value>)" >&2
-        return 1
+        echo "[!] $msg" >&2
+        echo "    (stdin isn't a TTY; pass --${var,,} <value>)" >&2
+        exit 1
     fi
-    printf '%s\n' "$msg"
+    echo "$msg"
     read -rp "> " "$var"
 }
 
 usage() {
     cat <<EOF
 Usage:
-  $SCRIPT_NAME                  # interactive — asks everything
+  $SCRIPT_NAME                          # interactive — asks everything
   $SCRIPT_NAME [options]
 
 Options:
   --nether HOST         Subscription-manager SSH alias, default: nether2
-  --data-dir PATH       Remote data dir, default: /opt/subscription-manager/data
-
-  --shared-url URL      Lay a single http URL into every user's
-                        data/<u>/foreign/<name>.txt (no Marzban API call)
-                        Most useful when a single Marzban sub URL is shared
-                        by all users. mihomo fetches & parses it itself.
-  --name FILENAME       Remote filename in foreign/, default: $REMOTE_FILENAME
-  --users "u1 u2 ..."   Restrict to subset (skip ssh enumeration)
-  --skip-build          Do not run buildvpn after upload
-  --dry-run             Show plan only
-
-gen_vless.sh mode (default if no --shared-url):
-  --server-alias NAME   Local folder name for out_keys/, default: vless
-  --reuse-local         Skip gen_vless.sh; need files already in out_keys/
-  --panel URL           Marzban panel URL (forwarded to gen_vless.sh)
-  --admin USERNAME      Marzban sudoer username (forwarded to gen_vless.sh)
-  --password-env VAR    Env var holding admin password, default: MARZBAN_ADMIN_PASSWORD
-  --inbound TAG         Default: VLESS TCP VISION REALITY
+  --data-dir PATH       Remote data dir, default: $DATA_DIR
+  --out-dir PATH        Local outputs go here, default: $OUT_DIR
+  --build-cmd CMD       Remote build command, default: $BUILD_CMD
+  --name FILE           Remote filename in foreign/, default: $REMOTE_FILENAME
+  --panel URL           Marzban panel URL (no /api)
+  --admin USER          Marzban sudoer username
+  --inbound TAG         Default: $INBOUND_TAG
   --limit-gb N          Data limit per user, 0 = unlimited
-  --expire-days N       Account lifetime, 0 = no expiry
-  --gen-script PATH     Default: $GEN_SCRIPT
-
+  --expire-days N       Expire in N days, 0 = never
+  --password-env VAR    Env var with admin password, default: $PASSWORD_ENV_NAME
+  --dry-run             Plan only, do not create users or upload
+  --skip-build          Do not run buildvpn (default: skip buildvpn)
+  --build               Run buildvpn after upload (overrides skip)
   -h, --help            Show this help
 EOF
 }
@@ -94,292 +80,243 @@ EOF
 while [[ $# -gt 0 ]]; do
     case "$1" in
         --nether)
-            NETHER_HOST="${2:?missing nether host}"
-            shift 2
-            ;;
+            NETHER_HOST="${2:?missing}"; shift 2 ;;
         --data-dir)
-            DATA_DIR="${2:?missing data dir}"
-            shift 2
-            ;;
-        --shared-url)
-            SHARED_URL="${2:?missing url}"
-            shift 2
-            ;;
-        --name)
-            REMOTE_FILENAME="${2:?missing filename}"
-            shift 2
-            ;;
-        --server-alias)
-            SERVER_ALIAS="${2:?missing alias}"
-            shift 2
-            ;;
-        --users)
-            USERS_OVERRIDE="${2:?missing users}"
-            shift 2
-            ;;
+            DATA_DIR="${2:?missing}"; shift 2 ;;
+        --out-dir)
+            OUT_DIR="${2:?missing}"; shift 2 ;;
         --build-cmd)
-            BUILD_CMD="${2:?missing build cmd}"
-            shift 2
-            ;;
-        --gen-script)
-            GEN_SCRIPT="${2:?missing gen script}"
-            shift 2
-            ;;
-        --reuse-local)
-            REUSE_LOCAL=1
-            shift
-            ;;
-        --skip-build)
-            SKIP_BUILD=1
-            shift
-            ;;
-        --dry-run)
-            DRY_RUN=1
-            shift
-            ;;
+            BUILD_CMD="${2:?missing}"; shift 2 ;;
+        --name)
+            REMOTE_FILENAME="${2:?missing}"; shift 2 ;;
         --panel)
-            GEN_PANEL="${2:?missing panel}"
-            shift 2
-            ;;
+            PANEL="${2:?missing}"; shift 2 ;;
         --admin)
-            GEN_ADMIN="${2:?missing admin}"
-            shift 2
-            ;;
+            ADMIN_USER="${2:?missing}"; shift 2 ;;
         --inbound)
-            GEN_INBOUND="${2:?missing inbound}"
-            shift 2
-            ;;
+            INBOUND_TAG="${2:?missing}"; shift 2 ;;
         --limit-gb)
-            GEN_LIMIT_GB="${2:?missing gb}"
-            shift 2
-            ;;
+            LIMIT_GB="${2:?missing}"; shift 2 ;;
         --expire-days)
-            GEN_EXPIRE_DAYS="${2:?missing days}"
-            shift 2
-            ;;
+            EXPIRE_DAYS="${2:?missing}"; shift 2 ;;
         --password-env)
-            GEN_PASSWORD_ENV="${2:?missing var}"
-            shift 2
-            ;;
+            PASSWORD_ENV_NAME="${2:?missing}"; shift 2 ;;
+        --dry-run)
+            DRY_RUN=1; shift ;;
+        --skip-build)
+            SKIP_BUILD=1; shift ;;
+        --build)
+            SKIP_BUILD=0; shift ;;
         -h|--help)
-            usage
-            exit 0
-            ;;
+            usage; exit 0 ;;
         -*)
-            echo "[!] Unknown option: $1" >&2
-            usage >&2
-            exit 1
-            ;;
+            echo "[!] Unknown option: $1" >&2; usage >&2; exit 1 ;;
         *)
-            echo "[!] Unexpected positional: $1" >&2
-            usage >&2
-            exit 1
-            ;;
+            echo "[!] Unexpected positional: $1" >&2; usage >&2; exit 1 ;;
     esac
 done
 
-# Filename: required
-if [[ -z "$REMOTE_FILENAME" ]]; then
-    ask REMOTE_FILENAME "Filename inside foreign/, e.g. Marzban.txt"
-    [[ -z "$REMOTE_FILENAME" ]] && REMOTE_FILENAME="Marzban.txt"
-fi
-case "$REMOTE_FILENAME" in
-    */*|.*|..)
-        echo "[!] Bad filename: $REMOTE_FILENAME" >&2
-        exit 1
-        ;;
-esac
-
 sq() { printf "'"; printf "%s" "$1" | sed "s/'/'\\\\''/g"; printf "'"; }
 
-# ===========================================================
-# Mode 1: shared URL (simple)
-# ===========================================================
-if [[ -n "$SHARED_URL" ]]; then
-    echo "[*] Mode: shared URL -> every user"
-    echo "[*] URL:        $SHARED_URL"
-    echo "[*] Filename:   $REMOTE_FILENAME"
-    echo "[*] Remote:     $NETHER_HOST"
-
-    if [[ -n "$USERS_OVERRIDE" ]]; then
-        mapfile -t USERS < <(printf '%s\n' "$USERS_OVERRIDE" | tr ' ' '\n' | sed '/^$/d')
-    else
-        mapfile -t USERS < <(
-            ssh "$NETHER_HOST" "cd $(sq "$DATA_DIR") && find . -mindepth 1 -maxdepth 1 -type d ! -name '.*' -printf '%f\n'" 2>/dev/null \
-                | LC_ALL=C sort
-        )
-    fi
-
-    if [[ "${#USERS[@]}" -eq 0 ]]; then
-        echo "[!] No users found" >&2
-        exit 1
-    fi
-
-    echo "[*] Users: ${#USERS[@]}"
-    printf '    %s\n' "${USERS[@]}"
-    echo
-
-    if [[ "$DRY_RUN" -eq 1 ]]; then
-        echo "[DRY] Would write URL into $NETHER_HOST:$DATA_DIR/<u>/foreign/$REMOTE_FILENAME"
-        for u in "${USERS[@]}"; do
-            ssh "$NETHER_HOST" "test -e $(sq "$DATA_DIR/$u/foreign/$REMOTE_FILENAME")" 2>/dev/null && \
-                echo "[DRY]   (remote already exists: $u)" >&2
-        done
-        exit 0
-    fi
-
-    EXISTING_REMOTE=()
-    for u in "${USERS[@]}"; do
-        if ssh "$NETHER_HOST" "test -e $(sq "$DATA_DIR/$u/foreign/$REMOTE_FILENAME")" 2>/dev/null; then
-            EXISTING_REMOTE+=("$DATA_DIR/$u/foreign/$REMOTE_FILENAME")
-        fi
-    done
-    if [[ "${#EXISTING_REMOTE[@]}" -gt 0 ]]; then
-        echo "[!] Abort: existing remote files:" >&2
-        printf '    %s\n' "${EXISTING_REMOTE[@]}" >&2
-        exit 1
-    fi
-
-    for u in "${USERS[@]}"; do
-        remote_dir="$DATA_DIR/$u/foreign"
-        remote_dst="$remote_dir/$REMOTE_FILENAME"
-        remote_tmp="$remote_dir/.$REMOTE_FILENAME.tmp.$$"
-        ssh "$NETHER_HOST" "set -e; mkdir -p $(sq "$remote_dir"); test ! -e $(sq "$remote_dst")"
-        ssh "$NETHER_HOST" "set -e; umask 077; cat > $(sq "$remote_tmp")" <<< "$SHARED_URL"
-        ssh "$NETHER_HOST" "set -e; test ! -e $(sq "$remote_dst"); mv $(sq "$remote_tmp") $(sq "$remote_dst")"
-        echo "    [OK] $u"
-    done
-
-    echo "[+] Done pushing"
-    [[ "$SKIP_BUILD" -eq 1 ]] && exit 0
-    echo "[*] Running buildvpn..."
-    cd_esc=$(printf '%s' "$DATA_DIR" | sed "s/'/'\\\\''/g")
-    ssh -tt "$NETHER_HOST" "bash -ic 'cd ${cd_esc} && ${BUILD_CMD}'"
-    exit 0
+# 1) Ask panel + admin + password (only what's missing)
+ask PANEL "Marzban panel URL, e.g. https://mirror.uvx.lol (no /api)"
+[[ -z "$PANEL" && -z "${DRY_RUN+x}" ]] && { echo "[!] panel URL required" >&2; exit 1; }
+PANEL="${PANEL%/}"
+[[ -n "$PANEL" ]] && if ! [[ "$PANEL" =~ ^https?:// ]]; then
+    echo "[!] not an http(s) URL: $PANEL" >&2; exit 1
 fi
+ask ADMIN_USER "Marzban admin / sudoer username"
+[[ -z "$ADMIN_USER" && -z "${DRY_RUN+x}" ]] && { echo "[!] admin user required" >&2; exit 1; }
 
-# ===========================================================
-# Mode 2 (default): per-user via Marzban API (or --reuse-local)
-# ===========================================================
-
-# Ask minimal: panel URL, admin username, password (env or tty)
-# Server-alias defaults to 'vless' - just a local folder name
-# Filename defaults to 'Marzban.txt'
-
-ask GEN_PANEL "Marzban panel URL (e.g. https://mirror.uvx.lol, NO /api)"
-if [[ -z "$GEN_PANEL" ]]; then
-    echo "[!] panel URL required (or pass --shared-url instead)" >&2
-    exit 1
-fi
-# Strip trailing slash just in case
-GEN_PANEL="${GEN_PANEL%/}"
-if ! [[ "$GEN_PANEL" =~ ^https?:// ]]; then
-    echo "[!] not an http(s) URL: $GEN_PANEL" >&2
-    exit 1
-fi
-
-ask GEN_ADMIN "Admin / sudoer username"
-
-echo
-echo "[*] Subscription host: $NETHER_HOST"
-echo "[*] Data dir:          $DATA_DIR"
-echo "[*] Remote filename:   $REMOTE_FILENAME"
-echo "[*] Local folder:      $LOCAL_OUT_DIR/$SERVER_ALIAS/"
-echo
-
-# User list via ssh
-if [[ -n "$USERS_OVERRIDE" ]]; then
-    mapfile -t USERS < <(printf '%s\n' "$USERS_OVERRIDE" | tr ' ' '\n' | sed '/^$/d')
-    echo "[*] Using --users: ${#USERS[@]} user(s)"
-else
-    echo "[*] Reading users from $NETHER_HOST..."
-    mapfile -t USERS < <(
-        ssh "$NETHER_HOST" "cd $(sq "$DATA_DIR") && find . -mindepth 1 -maxdepth 1 -type d ! -name '.*' -printf '%f\n'" \
-            || { echo "[!] ssh failed" >&2; exit 1; }
-    ) || true
-fi
+# 2) Read remote user list
+echo "[*] Reading users from $NETHER_HOST..."
+mapfile -t USERS < <(
+    ssh "$NETHER_HOST" "cd $(sq "$DATA_DIR") && find . -mindepth 1 -maxdepth 1 -type d ! -name '.*' -printf '%f\n'" \
+        || { echo "[!] ssh failed" >&2; exit 1; } \
+        | LC_ALL=C sort
+)
 
 if [[ "${#USERS[@]}" -eq 0 ]]; then
-    echo "[!] No users found on $NETHER_HOST:$DATA_DIR" >&2
+    echo "[!] No users in $NETHER_HOST:$DATA_DIR" >&2
     exit 1
 fi
 
-echo "[*] ${#USERS[@]} users will get a key. Names: ${USERS[*]}"
+echo "[*] ${#USERS[@]} remote user folders:"
+printf '    %s\n' "${USERS[@]}"
 echo
 
-# Pre-flight: existing remote files
-EXISTING_REMOTE=()
+# Validate + ensure folder name matches Marzban naming rules
+declare -a TO_CREATE=()
+declare -a TO_FETCH=()
 for u in "${USERS[@]}"; do
+    if [[ ! "$u" =~ ^[A-Za-z0-9._-]+$ ]]; then
+        echo "[!] Bad folder name (skip): '$u'" >&2
+        continue
+    fi
+    TO_FETCH+=("$u")
+done
+
+# 3) Authenticate with Marzban
+if [[ "$DRY_RUN" -eq 0 ]]; then
+    ADMIN_PASS=""
+    if [[ -n "${!PASSWORD_ENV_NAME:-}" ]]; then
+        ADMIN_PASS="${!PASSWORD_ENV_NAME}"
+    elif have_tty; then
+        read -rsp "Admin password (input hidden): " ADMIN_PASS
+        echo
+    else
+        echo "[!] Set $PASSWORD_ENV_NAME or run with a TTY" >&2
+        exit 1
+    fi
+    [[ -z "$ADMIN_PASS" ]] && { echo "[!] empty password" >&2; exit 1; }
+
+    echo "[*] Authenticating with Marzban..."
+    TOKEN_RESP=$(curl -fsS -X POST "$PANEL/api/admin/token" \
+        --data-urlencode "username=$ADMIN_USER" \
+        --data-urlencode "password=$ADMIN_PASS" 2>&1) || {
+            echo "[!] Failed to obtain admin token" >&2
+            echo "    Response head: $(printf '%s' "$TOKEN_RESP" | head -c 200)" >&2
+            exit 1
+        }
+    ACCESS_TOKEN=$(printf '%s' "$TOKEN_RESP" | jq -r '.access_token // empty')
+    if [[ -z "$ACCESS_TOKEN" ]]; then
+        echo "[!] No access_token in response" >&2
+        printf '    %s\n' "$TOKEN_RESP" | head >&2
+        exit 1
+    fi
+fi
+
+# 4) Pre-flight: refuse to overwrite remote files
+echo "[*] Pre-flight: refusing to overwrite remote files"
+EXISTING_REMOTE=()
+for u in "${TO_FETCH[@]}"; do
     if ssh "$NETHER_HOST" "test -e $(sq "$DATA_DIR/$u/foreign/$REMOTE_FILENAME")" 2>/dev/null; then
         EXISTING_REMOTE+=("$DATA_DIR/$u/foreign/$REMOTE_FILENAME")
     fi
 done
 if [[ "${#EXISTING_REMOTE[@]}" -gt 0 ]]; then
-    echo "[!] Abort: these remote files already exist:" >&2
+    echo "[!] Abort: remote files already exist:" >&2
     printf '    %s\n' "${EXISTING_REMOTE[@]}" >&2
     exit 1
 fi
 
-if [[ "$DRY_RUN" -eq 1 ]]; then
-    [[ "$REUSE_LOCAL" -eq 1 ]] && echo "[DRY] Reuse-local: skip gen_vless.sh" || echo "[DRY] Would run gen_vless.sh for ${#USERS[@]} users"
-    echo "[DRY] Would upload ${#USERS[@]} files"
-    for u in "${USERS[@]}"; do
-        echo "    out_keys/$SERVER_ALIAS/${u}.vless -> $NETHER_HOST:$DATA_DIR/$u/foreign/$REMOTE_FILENAME"
-    done
-    exit 0
+# 5) Prepare local out dir
+mkdir -p "$OUT_DIR" 2>/dev/null || true
+chmod 700 "$(dirname "$OUT_DIR")" 2>/dev/null || true
+
+NOW=$(date +%s)
+if [[ "$EXPIRE_DAYS" -gt 0 ]]; then
+    EXPIRE_JSON=$((NOW + EXPIRE_DAYS * 86400))
+else
+    EXPIRE_JSON=null
+fi
+if [[ "$LIMIT_GB" -gt 0 ]]; then
+    DL_JSON=$((LIMIT_GB * 1073741824))
+else
+    DL_JSON=null
 fi
 
-if [[ "$REUSE_LOCAL" -eq 1 ]]; then
-    MISSING_LOCAL=()
-    for u in "${USERS[@]}"; do
-        [[ ! -s "$LOCAL_OUT_DIR/$SERVER_ALIAS/${u}.vless" ]] && MISSING_LOCAL+=("$u")
-    done
-    if [[ "${#MISSING_LOCAL[@]}" -gt 0 ]]; then
-        echo "[!] Missing files in $LOCAL_OUT_DIR/$SERVER_ALIAS/: ${MISSING_LOCAL[*]}" >&2
+# 6) For each user: ensure exists on Marzban, then fetch .links[]
+GEN_TS=$(date -u '+%F %T')
+
+for u in "${TO_FETCH[@]}"; do
+    if [[ -e "$OUT_DIR/${u}.vless" ]]; then
+        echo "[*] $u: local vless cache already exists at $OUT_DIR/${u}.vless — skip"
+        continue
+    fi
+
+    if [[ "$DRY_RUN" -eq 1 ]]; then
+        echo "[DRY] Would ensure Marzban has user '$u' and fetch vless:// into $OUT_DIR/${u}.vless"
+        continue
+    fi
+
+    # Check if user already exists
+    CHECK=$(curl -fsS -H "Authorization: Bearer $ACCESS_TOKEN" \
+        "$PANEL/api/user/$u" 2>/dev/null || true)
+    HIT=$(printf '%s' "$CHECK" | jq -r '.username // empty' 2>/dev/null || true)
+
+    if [[ "$HIT" == "$u" ]]; then
+        echo "[*] $u: already exists on Marzban, fetching links[]"
+    else
+        echo "[*] $u: POST /api/user (creating)"
+        PAYLOAD=$(jq -n \
+            --arg u "$u" \
+            --arg inbound "$INBOUND_TAG" \
+            --arg note "added by sub_vless.sh @ ${GEN_TS}" \
+            --argjson expire "$EXPIRE_JSON" \
+            --argjson dl "$DL_JSON" \
+            --arg strategy "$RESET_STRATEGY" \
+            '{
+                status: "active",
+                username: $u,
+                note: $note,
+                proxies: { vless: { flow: "xtls-rprx-vision" } },
+                data_limit: $dl,
+                expire: $expire,
+                data_limit_reset_strategy: $strategy,
+                inbounds: { vless: [ $inbound ] }
+            }')
+        curl -fsS -X POST "$PANEL/api/user" \
+            -H "Authorization: Bearer $ACCESS_TOKEN" \
+            -H "Content-Type: application/json" \
+            --data "$PAYLOAD" 2>&1 \
+            | head -c 200
+        echo
+    fi
+
+    # Fetch vless:// from .links[]
+    USER_DATA=$(curl -fsS -H "Authorization: Bearer $ACCESS_TOKEN" \
+        "$PANEL/api/user/$u" 2>&1) || {
+            echo "[!] Could not GET $u" >&2
+            exit 1
+        }
+    LINKS=$(printf '%s' "$USER_DATA" | jq -r '.links[]?' 2>/dev/null | grep '^vless://' || true)
+
+    if [[ -z "$(printf '%s' "$LINKS" | tr -d '[:space:]')" ]]; then
+        echo "[!] No vless:// from .links[] for $u" >&2
+        printf '    user data: %s\n' "$USER_DATA" | head -c 400 >&2
         exit 1
     fi
-else
-    [[ ! -f "$GEN_SCRIPT" ]] && { echo "[!] $GEN_SCRIPT not found" >&2; exit 1; }
 
-    GEN_CMD=(bash "$GEN_SCRIPT"
-        --panel "$GEN_PANEL"
-        --admin "$GEN_ADMIN"
-        --skip-existing
-        --password-env "$GEN_PASSWORD_ENV"
-        --out-dir "$LOCAL_OUT_DIR"
-    )
-    if [[ -n "$GEN_INBOUND" ]]; then
-        GEN_CMD+=(--inbound "$GEN_INBOUND")
-    fi
-    if [[ "${GEN_LIMIT_GB:-0}" -gt 0 ]]; then
-        GEN_CMD+=(--limit-gb "$GEN_LIMIT_GB")
-    fi
-    if [[ "${GEN_EXPIRE_DAYS:-0}" -gt 0 ]]; then
-        GEN_CMD+=(--expire-days "$GEN_EXPIRE_DAYS")
-    fi
-    GEN_CMD+=("$SERVER_ALIAS")
-    GEN_CMD+=("${USERS[@]}")
+    {
+        printf '# sub_vless.sh generated\n'
+        printf '# Marzban user: %s\n' "$u"
+        printf '# Panel:        %s\n' "$PANEL"
+        printf '# Generated at: %s\n' "$GEN_TS"
+        printf '%s\n' "$LINKS"
+    } > "$OUT_DIR/${u}.vless"
+    chmod 600 "$OUT_DIR/${u}.vless"
+    echo "    [OK] $u saved $OUT_DIR/${u}.vless ($(printf '%s' "$LINKS" | grep -c '^vless://' || echo 0) link(s))"
+done
 
-    echo "[*] Running: ${GEN_CMD[*]}"
-    echo
-    "${GEN_CMD[@]}"
-fi
-
+# 7) Upload each .vless to remote foreign/<REMOTE_FILENAME>
 echo
 echo "[*] Uploading to $NETHER_HOST..."
-for u in "${USERS[@]}"; do
-    conf="$LOCAL_OUT_DIR/$SERVER_ALIAS/${u}.vless"
+
+for u in "${TO_FETCH[@]}"; do
+    conf="$OUT_DIR/${u}.vless"
+    [[ ! -s "$conf" ]] && { echo "[!] Missing local $conf (skipped)" >&2; continue; }
     remote_dir="$DATA_DIR/$u/foreign"
     remote_dst="$remote_dir/$REMOTE_FILENAME"
     remote_tmp="$remote_dir/.$REMOTE_FILENAME.tmp.$$"
     ssh "$NETHER_HOST" "set -e; mkdir -p $(sq "$remote_dir"); test ! -e $(sq "$remote_dst")"
     ssh "$NETHER_HOST" "set -e; umask 077; cat > $(sq "$remote_tmp")" < "$conf"
     ssh "$NETHER_HOST" "set -e; test ! -e $(sq "$remote_dst"); mv $(sq "$remote_tmp") $(sq "$remote_dst")"
-    echo "    [OK] $u"
+    echo "    [OK] $u -> $remote_dst"
 done
 
+echo
 echo "[+] Done"
-[[ "$SKIP_BUILD" -eq 1 ]] && exit 0
+
+if [[ "$DRY_RUN" -eq 1 ]]; then
+    exit 0
+fi
+
+if [[ "$SKIP_BUILD" -eq 1 ]]; then
+    echo "[*] Skipping buildvpn (pass --build to run it)"
+    exit 0
+fi
+
 echo "[*] Running buildvpn..."
 cd_esc=$(printf '%s' "$DATA_DIR" | sed "s/'/'\\\\''/g")
 ssh -tt "$NETHER_HOST" "bash -ic 'cd ${cd_esc} && ${BUILD_CMD}'"
