@@ -174,6 +174,12 @@ while [[ $# -gt 0 ]]; do
 done
 
 SERVER_ALIAS="${1:-}"
+
+if [[ -z "$SERVER_ALIAS" && "$DRY_RUN" -eq 0 ]] && [[ -t 0 ]] && [[ -z "$USERS_OVERRIDE" ]]; then
+    echo "Server alias (folder under $LOCAL_OUT_DIR_BASE/, e.g. marzban1):"
+    read -rp "> " SERVER_ALIAS
+fi
+
 if [[ -z "$SERVER_ALIAS" ]]; then
     echo "[!] Server alias is required." >&2
     usage >&2
@@ -185,10 +191,9 @@ if [[ ! "$SERVER_ALIAS" =~ ^[A-Za-z0-9._-]+$ ]]; then
     exit 1
 fi
 
-if [[ -z "$REMOTE_FILENAME" ]]; then
-    if [[ "$DRY_RUN" -eq 0 ]] && [[ -t 0 ]]; then
-        read -rp "Filename inside foreign/, e.g. Marzban.txt: " REMOTE_FILENAME
-    fi
+if [[ -z "$REMOTE_FILENAME" ]] && [[ "$DRY_RUN" -eq 0 ]] && [[ -t 0 ]]; then
+    echo "Filename inside foreign/, e.g. Marzban.txt:"
+    read -rp "> " REMOTE_FILENAME
 fi
 
 if [[ -z "$REMOTE_FILENAME" ]]; then
