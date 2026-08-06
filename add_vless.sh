@@ -37,7 +37,7 @@ Modes:
 Common:
   --server   ALIAS   Folder name under $LOCAL_OUT_DIR_BASE/, e.g. marzban1
   --user     U       Target username on subscription-manager, e.g. Me
-  --name     FILE    Filename in data/<user>/foreign/, e.g. Marzban.txt
+  --name     FILE    Filename in data/<user>/foreign/ (anything you want)
   --nether   HOST    Subscription-manager SSH alias, default: nether2
   --data-dir PATH    Remote data dir, default: /opt/subscription-manager/data
   --skip-build       Do not run buildvpn after upload
@@ -121,7 +121,7 @@ if [[ "$DRY_RUN" -eq 0 ]] && have_tty && [[ -z "$USER" ]]; then
     read -rp "Target username on subscription-manager (e.g. Me): " USER <&3
 fi
 if [[ "$DRY_RUN" -eq 0 ]] && have_tty && [[ -z "$REMOTE_FILENAME" ]]; then
-    read -rp "Filename in data/<user>/foreign/ (e.g. Marzban.txt): " REMOTE_FILENAME <&3
+    read -rp "Filename in data/<user>/foreign/ (anything you want): " REMOTE_FILENAME <&3
 fi
 
 # Validate

@@ -29,6 +29,7 @@ OUT_DIR="${OUT_DIR:-./out_keys/vless}"
 REMOTE_FILENAME="${REMOTE_FILENAME:-}"   # always ask, never silent default
 DRY_RUN=0
 SKIP_BUILD=1   # default: do NOT run buildvpn (run --build to override)
+NO_CACHE=0      # by default: skip users whose local <u>.vless already exists
 
 PANEL=""
 ADMIN_USER=""
@@ -72,6 +73,10 @@ Options:
   --expire-days N       Expire in N days, 0 = never
   --password-env VAR    Env var with admin password, default: $PASSWORD_ENV_NAME
   --dry-run             Plan only, do not create users or upload
+  --no-cache            Force-refresh vless:// for every user (ignore
+                        local ./out_keys/<u>.vless; even if the cached
+                        file is from a different panel, re-fetch from the
+                        current one)
   --skip-build          Do not run buildvpn (default: skip buildvpn)
   --build               Run buildvpn after upload (overrides skip)
   -h, --help            Show this help
@@ -108,6 +113,8 @@ while [[ $# -gt 0 ]]; do
             SKIP_BUILD=1; shift ;;
         --build)
             SKIP_BUILD=0; shift ;;
+        --no-cache)
+            NO_CACHE=1; shift ;;
         -h|--help)
             usage; exit 0 ;;
         -*)
@@ -124,9 +131,9 @@ ask PANEL "Marzban panel URL, e.g. https://mirror.uvx.lol (no /api)"
 # Ask filename early (before any ssh/api side-effects).
 if [[ -z "$REMOTE_FILENAME" ]]; then
     echo
-    echo "Pick the filename that goes into"
+    echo "Pick a basename for"
     echo "    $NETHER_HOST:$DATA_DIR/<user>/foreign/<FILE>"
-    echo "(just the basename, no path. e.g. Marzban.txt, EuWest.txt, ...)"
+    echo "(just the file basename, no path; pick anything you like)"
     ask REMOTE_FILENAME "Filename"
 fi
 if [[ -z "$REMOTE_FILENAME" ]]; then
@@ -298,10 +305,22 @@ GEN_TS=$(date -u '+%F %T')
 for u in "${TO_FETCH[@]}"; do
     SAFE_U=$(resolve_safe "$u")
     echo "[*] $u -> Marzban user '$SAFE_U'"
+    if [[ "$NO_CACHE" -eq 1 ]]; then
+        rm -f "$OUT_DIR/${u}.vless"
+    fi
     if [[ -e "$OUT_DIR/${u}.vless" ]]; then
-        echo "    (cached locally; delete to regenerate) $OUT_DIR/${u}.vless"
-        echo "    [SKIP] $u"
-        continue
+        # The cached file records which panel produced it; reuse only if
+        # this run's panel matches. If you switched panel for a new server,
+        # we don't want to upload keys from the old one.
+        cached_panel=$(awk -F'# Panel:[[:space:]]*' '/^# Panel:/ {print $2; exit}' "$OUT_DIR/${u}.vless" 2>/dev/null || true)
+        if [[ -n "$cached_panel" && "$cached_panel" != "$PANEL" ]]; then
+            echo "    cached file is from a different panel ($cached_panel); not reusing -- regenerating"
+            rm -f "$OUT_DIR/${u}.vless"
+        else
+            echo "    cached locally (delete or pass --no-cache to refetch): $OUT_DIR/${u}.vless"
+            echo "    [SKIP] $u"
+            continue
+        fi
     fi
 
     if [[ "$DRY_RUN" -eq 1 ]]; then
