@@ -93,6 +93,27 @@ while [[ $# -gt 0 ]]; do
 done
 
 SERVER_ALIAS="${1:-}"
+if [[ -z "$SERVER_ALIAS" && -n "$USERS_OVERRIDE" && -d "$LOCAL_OUT_DIR_BASE" ]]; then
+    mapfile -t WANTED_USERS < <(printf '%s\n' "$USERS_OVERRIDE" | tr ' ' '\n' | sed '/^$/d')
+    if [[ "${#WANTED_USERS[@]}" -gt 0 ]]; then
+        for d in "$LOCAL_OUT_DIR_BASE"/*; do
+            [[ -d "$d" ]] || continue
+            ok=1
+            for u in "${WANTED_USERS[@]}"; do
+                if [[ ! -e "$d/${u}.vless" ]]; then
+                    ok=0
+                    break
+                fi
+            done
+            if [[ $ok -eq 1 ]]; then
+                SERVER_ALIAS=$(basename "$d")
+                echo "[*] Auto-detected server alias (${#WANTED_USERS[@]} user(s) all present): $SERVER_ALIAS"
+                break
+            fi
+        done
+    fi
+fi
+
 if [[ -z "$SERVER_ALIAS" ]]; then
     if [[ -d "$LOCAL_OUT_DIR_BASE" ]]; then
         sub_count=0
@@ -104,13 +125,13 @@ if [[ -z "$SERVER_ALIAS" ]]; then
         done
         if [[ $sub_count -eq 1 ]]; then
             SERVER_ALIAS=$(basename "$sub_only")
-            echo "[*] Auto-detected server alias: $SERVER_ALIAS"
+            echo "[*] Auto-detected server alias (only subdir): $SERVER_ALIAS"
         fi
     fi
 fi
 
 if [[ -z "$SERVER_ALIAS" ]]; then
-    echo "[!] Server alias is required (or leave one subdir under $LOCAL_OUT_DIR_BASE)." >&2
+    echo "[!] Server alias is required (or leave one subdir under $LOCAL_OUT_DIR_BASE, or pass --users so a matching subdir can be picked)." >&2
     usage >&2
     exit 1
 fi
