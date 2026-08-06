@@ -94,7 +94,23 @@ done
 
 SERVER_ALIAS="${1:-}"
 if [[ -z "$SERVER_ALIAS" ]]; then
-    echo "[!] Server alias is required." >&2
+    if [[ -d "$LOCAL_OUT_DIR_BASE" ]]; then
+        sub_count=0
+        sub_only=""
+        for d in "$LOCAL_OUT_DIR_BASE"/*; do
+            [[ -d "$d" ]] || continue
+            sub_count=$((sub_count + 1))
+            sub_only="$d"
+        done
+        if [[ $sub_count -eq 1 ]]; then
+            SERVER_ALIAS=$(basename "$sub_only")
+            echo "[*] Auto-detected server alias: $SERVER_ALIAS"
+        fi
+    fi
+fi
+
+if [[ -z "$SERVER_ALIAS" ]]; then
+    echo "[!] Server alias is required (or leave one subdir under $LOCAL_OUT_DIR_BASE)." >&2
     usage >&2
     exit 1
 fi
