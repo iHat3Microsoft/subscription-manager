@@ -228,32 +228,78 @@ if [[ "$LIMIT_GB" -gt 0 ]]; then
 else
     DL_JSON=null
 fi
+mkdir -p "$OUT_DIR" 2>/dev/null || true
+
+# Marzban username rules: 3..32 chars, only [a-z0-9_]. Our local folders
+# (Me, Vasya, artem_mirea, friend_nikita-kurilkin) often violate these.
+# Sanitize to a stable, deterministic, safe username; keep an orig<->safe
+# map file at $OUT_DIR/_users.tsv so re-runs use the same Marzban name.
+MAP_FILE="$OUT_DIR/_users.tsv"
+mk_safe() {
+    # mk_safe <orig>
+    local s="${1,,}"
+    s="${s//[^a-z0-9_]/_}"
+    while [[ "${#s}" -lt 3 ]]; do s="${s}_x"; done
+    while [[ "${#s}" -gt 30 ]]; do s="${s%_}"; done
+    printf '%s' "$s"
+}
+declare -A ORIG_TO_SAFE=()
+declare -A SAFE_TO_ORIG=()
+if [[ -f "$MAP_FILE" ]]; then
+    while IFS=$'\t' read -r safe orig; do
+        [[ -z "$safe" || -z "$orig" ]] && continue
+        ORIG_TO_SAFE["$orig"]="$safe"
+        SAFE_TO_ORIG["$safe"]="$orig"
+    done < "$MAP_FILE"
+fi
+resolve_safe() {
+    # resolve_safe <orig>  -> echoes a stable safe username
+    local orig="$1" safe="" hash=""
+    if [[ -n "${ORIG_TO_SAFE[$orig]:-}" ]]; then echo "${ORIG_TO_SAFE[$orig]}"; return; fi
+    safe=$(mk_safe "$orig")
+    if [[ -n "${SAFE_TO_ORIG[$safe]:-}" && "${SAFE_TO_ORIG[$safe]}" != "$orig" ]]; then
+        # collision: append 4-hex suffix from sha1 of orig
+        if command -v sha1sum >/dev/null 2>&1; then
+            hash=$(printf '%s' "$orig" | sha1sum | cut -c1-4)
+        else
+            hash=$(printf '%s' "$orig" | md5sum 2>/dev/null | cut -c1-4)
+        fi
+        safe="${safe}_${hash}"
+    fi
+    ORIG_TO_SAFE["$orig"]="$safe"
+    SAFE_TO_ORIG["$safe"]="$orig"
+    printf '%s\t%s\n' "$safe" "$orig" >> "$MAP_FILE"
+    echo "$safe"
+}
 
 # 6) For each user: ensure exists on Marzban, then fetch .links[]
 GEN_TS=$(date -u '+%F %T')
 
 for u in "${TO_FETCH[@]}"; do
+    SAFE_U=$(resolve_safe "$u")
+    echo "[*] $u -> Marzban user '$SAFE_U'"
     if [[ -e "$OUT_DIR/${u}.vless" ]]; then
-        echo "[*] $u: local vless cache already exists at $OUT_DIR/${u}.vless — skip"
+        echo "    (cached locally; delete to regenerate) $OUT_DIR/${u}.vless"
+        echo "    [SKIP] $u"
         continue
     fi
 
     if [[ "$DRY_RUN" -eq 1 ]]; then
-        echo "[DRY] Would ensure Marzban has user '$u' and fetch vless:// into $OUT_DIR/${u}.vless"
+        echo "    [DRY] Would ensure Marzban has '$SAFE_U' and fetch vless:// into $OUT_DIR/${u}.vless"
         continue
     fi
 
     # Fetch vless:// from .links[]
     USER_DATA=$(curl -fsS --max-time 15 -H "Authorization: Bearer $ACCESS_TOKEN" \
-        "$PANEL/api/user/$u" 2>&1) || true
+        "$PANEL/api/user/$SAFE_U" 2>&1) || true
     HIT=$(printf '%s' "$USER_DATA" | jq -r '.username // empty' 2>/dev/null || true)
 
-    if [[ "$HIT" != "$u" ]]; then
-        echo "[*] $u: POST /api/user (creating)"
+    if [[ "$HIT" != "$SAFE_U" ]]; then
+        echo "    POST $PANEL/api/user (creating '$SAFE_U')"
         PAYLOAD=$(jq -n \
-            --arg u "$u" \
+            --arg u "$SAFE_U" \
             --arg inbound "$INBOUND_TAG" \
-            --arg note "added by sub_vless.sh @ ${GEN_TS}" \
+            --arg note "added by sub_vless.sh @ ${GEN_TS} (folder: ${u})" \
             --argjson expire "$EXPIRE_JSON" \
             --argjson dl "$DL_JSON" \
             --arg strategy "$RESET_STRATEGY" \
@@ -267,54 +313,58 @@ for u in "${TO_FETCH[@]}"; do
                 data_limit_reset_strategy: $strategy,
                 inbounds: { vless: [ $inbound ] }
             }')
-        # Capture POST response + HTTP code so we can detect 422/409 cleanly.
+        # Capture POST response + HTTP code so we can detect 422 cleanly.
         POST_RESP=$(mktemp)
         POST_CODE=$(curl -sS --max-time 15 -o "$POST_RESP" -w '%{http_code}' \
             -X POST "$PANEL/api/user" \
             -H "Authorization: Bearer $ACCESS_TOKEN" \
             -H "Content-Type: application/json" \
             --data "$PAYLOAD" 2>&1)
-        printf '   POST %s -> HTTP %s\n' "$PANEL/api/user" "$POST_CODE"
+        printf '      -> HTTP %s\n' "$POST_CODE"
         head -c 400 "$POST_RESP"
         printf '\n'
         rm -f "$POST_RESP"
 
         if [[ "$POST_CODE" == "200" || "$POST_CODE" == "201" ]]; then
             : # created
-        elif [[ "$POST_CODE" == "409" || "$POST_CODE" == "422" ]]; then
-            echo "[*]   (${POST_CODE}: user likely already exists; proceeding to read it)"
+        elif [[ "$POST_CODE" == "409" ]]; then
+            echo "    (409, will read existing)"
+        elif [[ "$POST_CODE" == "422" ]]; then
+            echo "    [!] 422 on create: Marzban rejected (probably bad chars). Check $MAP_FILE." >&2
+            continue
         else
-            echo "[!] $u: POST failed (HTTP $POST_CODE); abort for this user." >&2
+            echo "    [!] HTTP $POST_CODE -> abort this user" >&2
             continue
         fi
 
         # Re-read to get fresh .links[]
         USER_DATA=$(curl -fsS --max-time 15 -H "Authorization: Bearer $ACCESS_TOKEN" \
-            "$PANEL/api/user/$u" 2>&1) || {
-                echo "[!] Could not GET $u after POST" >&2
+            "$PANEL/api/user/$SAFE_U" 2>&1) || {
+                echo "[!] Could not GET $SAFE_U after POST" >&2
                 exit 1
             }
     else
-        echo "[*] $u: already exists on Marzban"
+        echo "    already exists on Marzban"
     fi
 
     LINKS=$(printf '%s' "$USER_DATA" | jq -r '.links[]?' 2>/dev/null | grep '^vless://' || true)
 
     if [[ -z "$(printf '%s' "$LINKS" | tr -d '[:space:]')" ]]; then
-        echo "[!] No vless:// from .links[] for $u" >&2
-        printf '    user data head: %s\n' "$USER_DATA" | head -c 400 >&2
-        exit 1
+        echo "    [!] no vless:// from .links[]" >&2
+        printf '        user data head: %s\n' "$USER_DATA" | head -c 400 >&2
+        continue
     fi
 
     {
         printf '# sub_vless.sh generated\n'
-        printf '# Marzban user: %s\n' "$u"
-        printf '# Panel:        %s\n' "$PANEL"
-        printf '# Generated at: %s\n' "$GEN_TS"
+        printf '# Local folder:  %s\n' "$u"
+        printf '# Marzban user:  %s\n' "$SAFE_U"
+        printf '# Panel:         %s\n' "$PANEL"
+        printf '# Generated at:  %s\n' "$GEN_TS"
         printf '%s\n' "$LINKS"
     } > "$OUT_DIR/${u}.vless"
     chmod 600 "$OUT_DIR/${u}.vless"
-    echo "    [OK] $u saved $OUT_DIR/${u}.vless ($(printf '%s' "$LINKS" | grep -c '^vless://' || echo 0) link(s))"
+    echo "    [OK] saved $OUT_DIR/${u}.vless ($(printf '%s' "$LINKS" | grep -c '^vless://' || echo 0) link(s))"
 done
 
 # 7) Upload each .vless to remote foreign/<REMOTE_FILENAME>
