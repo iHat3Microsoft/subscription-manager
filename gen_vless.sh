@@ -26,6 +26,7 @@ OUT_DIR="./out_keys"
 DATA_RESET_STRATEGY="day"
 PROXIES_FLOW="xtls-rprx-vision"
 PASSWORD_ENV=""
+SKIP_EXISTING=0
 
 usage() {
     cat <<EOF
@@ -49,6 +50,8 @@ Options:
   --out-dir DIR            Local output dir, default: ./out_keys
   --password-env VAR       Name of env var holding admin password
                            (skips interactive prompt).
+  --skip-existing          If a user already exists on the panel,
+                           skip it instead of failing.
   --dry-run                Print payloads, do not call the API.
   -h, --help               Show this help.
 
@@ -96,6 +99,10 @@ while [[ $# -gt 0 ]]; do
         --password-env)
             PASSWORD_ENV="${2:?missing env var name}"
             shift 2
+            ;;
+        --skip-existing)
+            SKIP_EXISTING=1
+            shift
             ;;
         --dry-run)
             DRY_RUN=1
@@ -295,6 +302,18 @@ fi
 GEN_TS=$(date -u +%F %T)
 
 for u in "${USERS[@]}"; do
+    if [[ "$SKIP_EXISTING" -eq 1 ]]; then
+        CHECK=$(curl -fsS -H "Authorization: Bearer $ACCESS_TOKEN" \
+            "$PANEL_URL/api/user/$u" 2>/dev/null || true)
+        if [[ -n "$CHECK" ]]; then
+            USERNAME_HIT=$(printf '%s' "$CHECK" | jq -r '.username // empty')
+            if [[ "$USERNAME_HIT" == "$u" ]]; then
+                echo "[*] $u already exists on panel, skipping creation"
+                continue
+            fi
+        fi
+    fi
+
     PAYLOAD=$(jq -n \
         --arg username "$u" \
         --arg inbound "$INBOUND_TAG" \
@@ -319,6 +338,7 @@ for u in "${USERS[@]}"; do
         -H "Content-Type: application/json" \
         --data "$PAYLOAD") || {
             echo "[!] Failed to create user $u" >&2
+            echo "    Use --skip-existing to silently skip pre-existing users." >&2
             exit 1
         }
 
