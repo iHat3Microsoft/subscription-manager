@@ -26,10 +26,11 @@ NETHER_HOST="${NETHER_HOST:-nether2}"
 DATA_DIR="${DATA_DIR:-/opt/subscription-manager/data}"
 BUILD_CMD="${BUILD_CMD:-buildvpn}"
 OUT_DIR="${OUT_DIR:-./out_keys/vless}"
-REMOTE_FILENAME="${REMOTE_FILENAME:-}"   # always ask, never silent default
+REMOTE_FILENAME="${REMOTE_FILENAME:-Marzban.txt}"
 DRY_RUN=0
 SKIP_BUILD=1   # default: do NOT run buildvpn (run --build to override)
 NO_CACHE=0      # by default: skip users whose local <u>.vless already exists
+MODE="url"      # default: save subscription_url instead of vless keys
 
 PANEL=""
 ADMIN_USER=""
@@ -66,6 +67,8 @@ Options:
   --build-cmd CMD       Remote build command, default: $BUILD_CMD
   --name FILE           Remote filename in foreign/ (default: empty,
                         always asked interactively)
+  --mode [url|vless]    Output mode: 'url' (default) for subscription_url,
+                        or 'vless' for raw vless:// strings.
   --panel URL           Marzban panel URL (no /api)
   --admin USER          Marzban sudoer username
   --inbound TAG         Default: $INBOUND_TAG
@@ -93,6 +96,8 @@ while [[ $# -gt 0 ]]; do
             OUT_DIR="${2:?missing}"; shift 2 ;;
         --build-cmd)
             BUILD_CMD="${2:?missing}"; shift 2 ;;
+        --mode)
+            MODE="${2:?missing}"; shift 2 ;;
         --name)
             REMOTE_FILENAME="${2:?missing}"; shift 2 ;;
         --panel)
@@ -386,12 +391,20 @@ for u in "${TO_FETCH[@]}"; do
         echo "    already exists on Marzban"
     fi
 
-    LINKS=$(printf '%s' "$USER_DATA" | jq -r '.links[]?' 2>/dev/null | grep '^vless://' || true)
-
-    if [[ -z "$(printf '%s' "$LINKS" | tr -d '[:space:]')" ]]; then
-        echo "    [!] no vless:// from .links[]" >&2
-        printf '        user data head: %s\n' "$USER_DATA" | head -c 400 >&2
-        continue
+    if [[ "$MODE" == "url" ]]; then
+        LINKS=$(printf '%s' "$USER_DATA" | jq -r '.subscription_url // empty' 2>/dev/null || true)
+        if [[ -z "$(printf '%s' "$LINKS" | tr -d '[:space:]')" ]]; then
+            echo "    [!] no subscription_url for $u" >&2
+            printf '        user data head: %s\n' "$USER_DATA" | head -c 400 >&2
+            continue
+        fi
+    else
+        LINKS=$(printf '%s' "$USER_DATA" | jq -r '.links[]?' 2>/dev/null | grep '^vless://' || true)
+        if [[ -z "$(printf '%s' "$LINKS" | tr -d '[:space:]')" ]]; then
+            echo "    [!] no vless:// from .links[] for $u" >&2
+            printf '        user data head: %s\n' "$USER_DATA" | head -c 400 >&2
+            continue
+        fi
     fi
 
     {
@@ -399,11 +412,17 @@ for u in "${TO_FETCH[@]}"; do
         printf '# Local folder:  %s\n' "$u"
         printf '# Marzban user:  %s\n' "$SAFE_U"
         printf '# Panel:         %s\n' "$PANEL"
+        printf '# Mode:          %s\n' "$MODE"
         printf '# Generated at:  %s\n' "$GEN_TS"
         printf '%s\n' "$LINKS"
     } > "$OUT_DIR/${u}.vless"
     chmod 600 "$OUT_DIR/${u}.vless"
-    echo "    [OK] saved $OUT_DIR/${u}.vless ($(printf '%s' "$LINKS" | grep -c '^vless://' || echo 0) link(s))"
+    
+    if [[ "$MODE" == "url" ]]; then
+        echo "    [OK] saved $OUT_DIR/${u}.vless (subscription_url)"
+    else
+        echo "    [OK] saved $OUT_DIR/${u}.vless ($(printf '%s' "$LINKS" | grep -c '^vless://' || echo 0) link(s))"
+    fi
 done
 
 # 7) Upload each .vless to remote foreign/<REMOTE_FILENAME>

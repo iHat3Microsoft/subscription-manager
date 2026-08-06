@@ -16,6 +16,7 @@ set -euo pipefail
 SCRIPT_NAME=$(basename "$0")
 
 DRY_RUN=0
+MODE="url"
 PANEL_URL=""
 ADMIN_USER=""
 INBOUND_TAG=""
@@ -39,6 +40,8 @@ Examples:
   $SCRIPT_NAME --panel https://marz.example.com --admin sheets --inbound 'VLESS TCP VISION REALITY' marzban1 alice
 
 Options:
+  --mode [url|vless]       vless: fetch vless keys.
+                           url (default): just create user & output subscription_url.
   --panel URL              Marzban panel base URL, e.g. https://marz.example.com
                            (no trailing slash). If omitted, asked interactively.
   --admin USERNAME         Admin/Sudoer username. If omitted, asked interactively.
@@ -64,6 +67,8 @@ EOF
 
 while [[ $# -gt 0 ]]; do
     case "$1" in
+        --mode)
+            MODE="${2:?missing mode}"; shift 2 ;;
         --panel)
             PANEL_URL="${2:?missing panel URL}"
             shift 2
@@ -385,33 +390,41 @@ for u in "${USERS[@]}"; do
 
     SUB_URL=$(printf '%s' "$RESP" | jq -r '.subscription_url // empty')
 
-    echo "[*] $u -> GET /api/user/$u (fetch links)"
-    USER_DATA=$(curl -fsS -H "Authorization: Bearer $ACCESS_TOKEN" \
-        "$PANEL_URL/api/user/$u" 2>/dev/null || true)
-
     LINKS=""
-    if [[ -n "$USER_DATA" ]]; then
-        LINKS=$(printf '%s' "$USER_DATA" | jq -r '.links[]? // empty' 2>/dev/null \
-                | grep '^vless://' || true)
-    fi
-
-    if [[ -z "$(printf '%s' "$LINKS" | tr -d '[:space:]')" && -n "$SUB_URL" && "$SUB_URL" != "null" ]]; then
-        echo "[*] $u -> GET $SUB_URL (fallback base64)"
-        SUB_BODY=$(curl -fsS -H "User-Agent: clash.meta" "$SUB_URL" 2>/dev/null || true)
-        if [[ -z "$SUB_BODY" ]]; then
-            echo "[!] Empty subscription response for $u at $SUB_URL" >&2
+    if [[ "$MODE" == "url" ]]; then
+        LINKS="$SUB_URL"
+        if [[ -z "$(printf '%s' "$LINKS" | tr -d '[:space:]')" || "$LINKS" == "null" ]]; then
+            echo "[!] No subscription_url for $u" >&2
             exit 1
         fi
-        LINKS=$(printf '%s' "$SUB_BODY" | base64 -d 2>/dev/null \
-                | awk 'NF && $0 !~ /^#/' \
-                | grep '^vless://' || true)
-    fi
+    else
+        echo "[*] $u -> GET /api/user/$u (fetch links)"
+        USER_DATA=$(curl -fsS -H "Authorization: Bearer $ACCESS_TOKEN" \
+            "$PANEL_URL/api/user/$u" 2>/dev/null || true)
 
-    if [[ -z "$(printf '%s' "$LINKS" | tr -d '[:space:]')" ]]; then
-        echo "[!] No vless://-links obtained for $u." >&2
-        echo "    /api/user response was:" >&2
-        printf '    %s\n' "$USER_DATA" >&2
-        exit 1
+        if [[ -n "$USER_DATA" ]]; then
+            LINKS=$(printf '%s' "$USER_DATA" | jq -r '.links[]? // empty' 2>/dev/null \
+                    | grep '^vless://' || true)
+        fi
+
+        if [[ -z "$(printf '%s' "$LINKS" | tr -d '[:space:]')" && -n "$SUB_URL" && "$SUB_URL" != "null" ]]; then
+            echo "[*] $u -> GET $SUB_URL (fallback base64)"
+            SUB_BODY=$(curl -fsS -H "User-Agent: clash.meta" "$SUB_URL" 2>/dev/null || true)
+            if [[ -z "$SUB_BODY" ]]; then
+                echo "[!] Empty subscription response for $u at $SUB_URL" >&2
+                exit 1
+            fi
+            LINKS=$(printf '%s' "$SUB_BODY" | base64 -d 2>/dev/null \
+                    | awk 'NF && $0 !~ /^#/' \
+                    | grep '^vless://' || true)
+        fi
+
+        if [[ -z "$(printf '%s' "$LINKS" | tr -d '[:space:]')" ]]; then
+            echo "[!] No vless://-links obtained for $u." >&2
+            echo "    /api/user response was:" >&2
+            printf '    %s\n' "$USER_DATA" >&2
+            exit 1
+        fi
     fi
 
     OUT="$OUT_DIR/$SERVER_ALIAS/${u}.vless"
@@ -419,6 +432,7 @@ for u in "${USERS[@]}"; do
         printf '# Marzban user: %s\n' "$u"
         printf '# Panel:         %s\n' "$PANEL_URL"
         printf '# Subscription:  %s\n' "$SUB_URL"
+        printf '# Mode:          %s\n' "$MODE"
         printf '# Generated at:  %s\n' "$GEN_TS"
         printf '# Inbounds:      vless=%s\n' "$INBOUND_TAG"
         printf '%s\n' "$LINKS"
