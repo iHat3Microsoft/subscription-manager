@@ -26,7 +26,7 @@ NETHER_HOST="${NETHER_HOST:-nether2}"
 DATA_DIR="${DATA_DIR:-/opt/subscription-manager/data}"
 BUILD_CMD="${BUILD_CMD:-buildvpn}"
 OUT_DIR="${OUT_DIR:-./out_keys/vless}"
-REMOTE_FILENAME="${REMOTE_FILENAME:-Marzban.txt}"
+REMOTE_FILENAME="${REMOTE_FILENAME:-}"   # always ask, never silent default
 DRY_RUN=0
 SKIP_BUILD=1   # default: do NOT run buildvpn (run --build to override)
 
@@ -63,7 +63,8 @@ Options:
   --data-dir PATH       Remote data dir, default: $DATA_DIR
   --out-dir PATH        Local outputs go here, default: $OUT_DIR
   --build-cmd CMD       Remote build command, default: $BUILD_CMD
-  --name FILE           Remote filename in foreign/, default: $REMOTE_FILENAME
+  --name FILE           Remote filename in foreign/ (default: empty,
+                        always asked interactively)
   --panel URL           Marzban panel URL (no /api)
   --admin USER          Marzban sudoer username
   --inbound TAG         Default: $INBOUND_TAG
@@ -120,6 +121,24 @@ sq() { printf "'"; printf "%s" "$1" | sed "s/'/'\\\\''/g"; printf "'"; }
 
 # 1) Ask panel + admin + password (only what's missing)
 ask PANEL "Marzban panel URL, e.g. https://mirror.uvx.lol (no /api)"
+# Ask filename early (before any ssh/api side-effects).
+if [[ -z "$REMOTE_FILENAME" ]]; then
+    echo
+    echo "Pick the filename that goes into"
+    echo "    $NETHER_HOST:$DATA_DIR/<user>/foreign/<FILE>"
+    echo "(just the basename, no path. e.g. Marzban.txt, EuWest.txt, ...)"
+    ask REMOTE_FILENAME "Filename"
+fi
+if [[ -z "$REMOTE_FILENAME" ]]; then
+    echo "[!] empty filename" >&2
+    exit 1
+fi
+case "$REMOTE_FILENAME" in
+    */*|.*|..)
+        echo "[!] Bad filename: $REMOTE_FILENAME" >&2
+        exit 1
+        ;;
+esac
 [[ -z "$PANEL" && -z "${DRY_RUN+x}" ]] && { echo "[!] panel URL required" >&2; exit 1; }
 if [[ -n "$PANEL" ]]; then
     if ! [[ "$PANEL" =~ ^https?:// ]]; then
@@ -156,6 +175,7 @@ fi
 
 echo "[*] ${#USERS[@]} remote user folders:"
 printf '    %s\n' "${USERS[@]}"
+echo "[*] Remote filename: $REMOTE_FILENAME"
 echo
 
 # Validate + ensure folder name matches Marzban naming rules
