@@ -328,15 +328,16 @@ if [[ -z "$ACCESS_TOKEN" || "$ACCESS_TOKEN" == "null" ]]; then
 fi
 
 NOW=$(date +%s)
+# 0 means unlimited / no expiry; emit JSON null instead of 0 (Marzban semantics).
 if [[ "$EXPIRE_DAYS" -gt 0 ]]; then
-    EXPIRE_UNIX=$((NOW + EXPIRE_DAYS * 86400))
+    EXPIRE_JSON=$((NOW + EXPIRE_DAYS * 86400))
 else
-    EXPIRE_UNIX=0
+    EXPIRE_JSON=null
 fi
 if [[ "$LIMIT_GB" -gt 0 ]]; then
-    DATA_LIMIT_BYTES=$((LIMIT_GB * 1073741824))
+    DATA_LIMIT_JSON=$((LIMIT_GB * 1073741824))
 else
-    DATA_LIMIT_BYTES=0
+    DATA_LIMIT_JSON=null
 fi
 
 GEN_TS=$(date -u +%F %T)
@@ -359,8 +360,8 @@ for u in "${USERS[@]}"; do
         --arg inbound "$INBOUND_TAG" \
         --arg flow "$PROXIES_FLOW" \
         --arg strategy "$DATA_RESET_STRATEGY" \
-        --argjson data_limit "$DATA_LIMIT_BYTES" \
-        --argjson expire "$EXPIRE_UNIX" \
+        --argjson data_limit "$DATA_LIMIT_JSON" \
+        --argjson expire "$EXPIRE_JSON" \
         '{
             status: "active",
             username: $username,

@@ -43,7 +43,7 @@ function loadRuPackages() {
 }
 
 // Helper to parse a single text chunk (file content)
-async function parseProxy(content) {
+async function parseProxy(content, baseName) {
   content = content.trim();
   if (!content) return null;
 
@@ -66,6 +66,19 @@ async function parseProxy(content) {
     }
   } catch (e) {
     // Not JSON
+  }
+
+  // Try HTTP subscription URL → proxy-provider (mihomo fetches it itself).
+  // Marzban subscription endpoint returns full Clash YAML when User-Agent
+  // is clash.meta, base64-vless otherwise. We force clash.meta so mihomo
+  // can parse the response as a proxy-provider file.
+  if (/^https?:\/\//.test(content)) {
+    const sub = parsers.parseSubscriptionUrl(content);
+    if (sub) {
+      sub.name = `sub-${baseName || 'unknown'}`;
+      sub.header = { 'User-Agent': 'clash.meta' };
+      return sub;
+    }
   }
 
   // Try parsing as share link or vpn://
@@ -625,17 +638,18 @@ async function buildAll() {
         const lines = content.split('\n');
         let validProxies = [];
 
+        const baseName = f.replace(/\.[^/.]+$/, "");
+
         for (let i = 0; i < lines.length; i++) {
-          const proxy = await parseProxy(lines[i]);
+          const proxy = await parseProxy(lines[i], baseName);
           if (proxy) validProxies.push(proxy);
         }
 
         if (content.includes('[Interface]') || content.trim().startsWith('{')) {
-          const proxy = await parseProxy(content);
+          const proxy = await parseProxy(content, baseName);
           if (proxy) validProxies.push(proxy);
         }
 
-        const baseName = f.replace(/\.[^/.]+$/, "");
         validProxies.forEach((p, idx) => {
           p.name = validProxies.length === 1 ? baseName : `${baseName}-${idx + 1}`;
           ruProxies.push(p);
@@ -651,17 +665,18 @@ async function buildAll() {
         const lines = content.split('\n');
         let validProxies = [];
 
+        const baseName = f.replace(/\.[^/.]+$/, "");
+
         for (let i = 0; i < lines.length; i++) {
-          const proxy = await parseProxy(lines[i]);
+          const proxy = await parseProxy(lines[i], baseName);
           if (proxy) validProxies.push(proxy);
         }
 
         if (content.includes('[Interface]') || content.trim().startsWith('{')) {
-          const proxy = await parseProxy(content);
+          const proxy = await parseProxy(content, baseName);
           if (proxy) validProxies.push(proxy);
         }
 
-        const baseName = f.replace(/\.[^/.]+$/, "");
         validProxies.forEach((p, idx) => {
           p.name = validProxies.length === 1 ? baseName : `${baseName}-${idx + 1}`;
           foreignProxies.push(p);
