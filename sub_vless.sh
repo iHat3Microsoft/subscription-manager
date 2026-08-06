@@ -26,7 +26,7 @@ NETHER_HOST="${NETHER_HOST:-nether2}"
 DATA_DIR="${DATA_DIR:-/opt/subscription-manager/data}"
 BUILD_CMD="${BUILD_CMD:-buildvpn}"
 OUT_DIR="${OUT_DIR:-./out_keys/vless}"
-REMOTE_FILENAME="${REMOTE_FILENAME:-Marzban.txt}"
+REMOTE_FILENAME="${REMOTE_FILENAME:-}"
 DRY_RUN=0
 SKIP_BUILD=0   # default: run buildvpn (run --skip-build to override)
 NO_CACHE=0      # by default: skip users whose local <u>.vless already exists
@@ -165,10 +165,6 @@ if [[ -n "$PANEL" ]]; then
     if [[ -z "$ORIGIN" ]]; then
         echo "[!] could not parse host:port from $PANEL" >&2
         exit 1
-    fi
-    if [[ "$ORIGIN" != "$PANEL" ]]; then
-        echo "[*] Stripping path -> using $ORIGIN (panel URL path is ignored;"
-        echo "    /api lives at the bare origin regardless of web-mordа prefix)"
     fi
     PANEL="$ORIGIN"
 fi
