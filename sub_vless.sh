@@ -1,7 +1,10 @@
 #!/usr/bin/env bash
 # sub_vless.sh — кладёт vless://-ключи из out_keys/<server-alias>/<user>.vless
 # в data/<user>/foreign/<remote-filename>.txt на удалённом сервере и
-# запускает buildvpn. Зеркало sub.sh, но для vless-ключей.
+# запускает buildvpn.
+#
+# Зеркало sub.sh для vless, но **source of truth — локальная папка**:
+# список юзеров берётся из ./out_keys/<alias>/*.vless (без ssh-enumeration).
 #
 # Зависимости: bash, ssh, scp.
 set -euo pipefail
@@ -21,9 +24,10 @@ USERS_OVERRIDE=""
 usage() {
     cat <<EOF
 Usage:
-  $SCRIPT_NAME [options] <server-alias>
+  $SCRIPT_NAME [options] [<server-alias>]
 
 Example:
+  $SCRIPT_NAME                                   # спросит всё интерактивно
   $SCRIPT_NAME marzban1
   $SCRIPT_NAME --name 'Marzban.txt' marzban1
   $SCRIPT_NAME --dry-run --name 'Marzban.txt' marzban1
@@ -36,10 +40,17 @@ Options:
   --build-cmd CMD      Remote build command, default: buildvpn
   --local-out DIR      Base dir with generated keys, default: ./out_keys
                        Keys taken from <DIR>/<server-alias>/<user>.vless
-  --users "u1 u2 ..."  Override user list (skip ssh enumeration)
+  --users "u1 u2 ..."  Restrict to a subset of users present locally
   --skip-build         Do not run buildvpn after upload
   --dry-run            Only show what would be done
   -h, --help           Show this help
+
+Behavior:
+  * User list is taken from \$OUT_DIR/<alias>/*.vless (default).
+    Pass --users to restrict; missing-from-disk users are skipped with a warning,
+    not an error.
+  * If a remote data/<u>/foreign/<name>.txt already exists, abort the
+    whole batch (no overwrite).
 EOF
 }
 
@@ -93,6 +104,7 @@ while [[ $# -gt 0 ]]; do
 done
 
 SERVER_ALIAS="${1:-}"
+
 if [[ -z "$SERVER_ALIAS" && -n "$USERS_OVERRIDE" && -d "$LOCAL_OUT_DIR_BASE" ]]; then
     mapfile -t WANTED_USERS < <(printf '%s\n' "$USERS_OVERRIDE" | tr ' ' '\n' | sed '/^$/d')
     if [[ "${#WANTED_USERS[@]}" -gt 0 ]]; then
@@ -155,7 +167,9 @@ if [[ -z "$SERVER_ALIAS" ]]; then
 fi
 
 if [[ -z "$REMOTE_FILENAME" ]]; then
-    read -rp "Filename inside foreign/, e.g. Marzban.txt: " REMOTE_FILENAME
+    if [[ "$DRY_RUN" -eq 0 ]] && { exec 3</dev/tty; } 2>/dev/null; then
+        read -rp "Filename inside foreign/, e.g. Marzban.txt: " REMOTE_FILENAME <&3
+    fi
 fi
 
 if [[ -z "$REMOTE_FILENAME" ]]; then
@@ -190,46 +204,69 @@ echo "[*] Local keys dir:     $LOCAL_OUT_DIR"
 echo "[*] Remote filename:    $REMOTE_FILENAME"
 echo
 
-if [[ -n "$USERS_OVERRIDE" ]]; then
-    mapfile -t USERS < <(printf '%s\n' "$USERS_OVERRIDE" | tr ' ' '\n' | sed '/^$/d')
-    echo "[*] Using --users override: ${#USERS[@]} user(s)"
-else
-    echo "[*] Reading users from $NETHER_HOST..."
-    mapfile -t USERS < <(
-        ssh_nether "cd $(sq "$DATA_DIR") && find . -mindepth 1 -maxdepth 1 -type d ! -name '.*' -printf '%f\n' | LC_ALL=C sort"
-    )
-fi
-
-if [[ "${#USERS[@]}" -eq 0 ]]; then
-    echo "[!] No users found in $NETHER_HOST:$DATA_DIR" >&2
-    exit 1
-fi
-
-echo "[*] Found users: ${#USERS[@]}"
-printf '    %s\n' "${USERS[@]}"
-echo
-
-for u in "${USERS[@]}"; do
-    if [[ ! "$u" =~ ^[A-Za-z0-9._-]+$ ]]; then
-        echo "[!] Bad user folder name: $u" >&2
-        exit 1
-    fi
-done
-
-echo "[*] Preflight: local vless files..."
-MISSING_LOCAL=()
-for u in "${USERS[@]}"; do
-    local_file="$LOCAL_OUT_DIR/${u}.vless"
-    if [[ ! -s "$local_file" ]]; then
-        MISSING_LOCAL+=("$u (missing $local_file)")
-    fi
-done
-if [[ "${#MISSING_LOCAL[@]}" -gt 0 ]]; then
-    echo "[!] Missing local vless files for:" >&2
-    printf '    %s\n' "${MISSING_LOCAL[@]}" >&2
+if [[ ! -d "$LOCAL_OUT_DIR" ]]; then
+    echo "[!] Local keys dir not found: $LOCAL_OUT_DIR" >&2
     echo "    Run gen_vless.sh $SERVER_ALIAS <users> first." >&2
     exit 1
 fi
+
+mapfile -t ALL_LOCAL_FILES < <(find "$LOCAL_OUT_DIR" -maxdepth 1 -type f -name '*.vless' | LC_ALL=C sort)
+
+if [[ "${#ALL_LOCAL_FILES[@]}" -eq 0 ]]; then
+    echo "[!] No .vless files in $LOCAL_OUT_DIR" >&2
+    echo "    Run gen_vless.sh $SERVER_ALIAS <users> first." >&2
+    exit 1
+fi
+
+declare -A LOCAL_USERS=()
+for f in "${ALL_LOCAL_FILES[@]}"; do
+    base=$(basename "$f" .vless)
+    LOCAL_USERS["$base"]="$f"
+done
+
+declare -A USERS_SET=()
+if [[ -n "$USERS_OVERRIDE" ]]; then
+    mapfile -t WANTED_USERS < <(printf '%s\n' "$USERS_OVERRIDE" | tr ' ' '\n' | sed '/^$/d')
+    for u in "${WANTED_USERS[@]}"; do
+        USERS_SET["$u"]=1
+    done
+fi
+
+USERS=()
+SKIPPED_NO_KEY=()
+for u in "${!LOCAL_USERS[@]}"; do
+    if [[ ${#USERS_SET[@]} -gt 0 && -z "${USERS_SET[$u]:-}" ]]; then
+        continue
+    fi
+    if [[ ! "$u" =~ ^[A-Za-z0-9._-]+$ ]]; then
+        echo "[!] Bad local filename: $u.vless" >&2
+        exit 1
+    fi
+    f="${LOCAL_USERS[$u]}"
+    if [[ ! -s "$f" ]]; then
+        SKIPPED_NO_KEY+=("$u (empty $f)")
+        continue
+    fi
+    USERS+=("$u")
+done
+
+if [[ "${#SKIPPED_NO_KEY[@]}" -gt 0 ]]; then
+    echo "[*] Skipping empty local files:" >&2
+    printf '    %s\n' "${SKIPPED_NO_KEY[@]}" >&2
+fi
+
+if [[ "${#USERS[@]}" -eq 0 ]]; then
+    echo "[!] No users with non-empty .vless files to upload." >&2
+    exit 1
+fi
+
+IFS=$'\n' SORTED=( $(printf '%s\n' "${USERS[@]}" | LC_ALL=C sort) )
+USERS=("${SORTED[@]}")
+unset IFS
+
+echo "[*] Users to upload: ${#USERS[@]}"
+printf '    %s\n' "${USERS[@]}"
+echo
 
 echo "[*] Preflight: checking remote target files..."
 EXISTING_REMOTE=()
