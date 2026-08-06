@@ -144,7 +144,7 @@ ask ADMIN_USER "Marzban admin / sudoer username"
 # 2) Read remote user list
 echo "[*] Reading users from $NETHER_HOST..."
 mapfile -t USERS < <(
-    ssh "$NETHER_HOST" "cd $(sq "$DATA_DIR") && find . -mindepth 1 -maxdepth 1 -type d ! -name '.*' -printf '%f\n'" \
+    ssh -o ConnectTimeout=10 -o BatchMode=yes "$NETHER_HOST" "cd $(sq "$DATA_DIR") && find . -mindepth 1 -maxdepth 1 -type d ! -name '.*' -printf '%f\n'" \
         || { echo "[!] ssh failed" >&2; exit 1; } \
         | LC_ALL=C sort
 )
@@ -203,7 +203,7 @@ fi
 echo "[*] Pre-flight: refusing to overwrite remote files"
 EXISTING_REMOTE=()
 for u in "${TO_FETCH[@]}"; do
-    if ssh "$NETHER_HOST" "test -e $(sq "$DATA_DIR/$u/foreign/$REMOTE_FILENAME")" 2>/dev/null; then
+    if ssh -o ConnectTimeout=10 -o BatchMode=yes "$NETHER_HOST" "test -e $(sq "$DATA_DIR/$u/foreign/$REMOTE_FILENAME")" 2>/dev/null; then
         EXISTING_REMOTE+=("$DATA_DIR/$u/foreign/$REMOTE_FILENAME")
     fi
 done
@@ -243,14 +243,12 @@ for u in "${TO_FETCH[@]}"; do
         continue
     fi
 
-    # Check if user already exists
-    CHECK=$(curl -fsS -H "Authorization: Bearer $ACCESS_TOKEN" \
-        "$PANEL/api/user/$u" 2>/dev/null || true)
-    HIT=$(printf '%s' "$CHECK" | jq -r '.username // empty' 2>/dev/null || true)
+    # Fetch vless:// from .links[]
+    USER_DATA=$(curl -fsS --max-time 15 -H "Authorization: Bearer $ACCESS_TOKEN" \
+        "$PANEL/api/user/$u" 2>&1) || true
+    HIT=$(printf '%s' "$USER_DATA" | jq -r '.username // empty' 2>/dev/null || true)
 
-    if [[ "$HIT" == "$u" ]]; then
-        echo "[*] $u: already exists on Marzban, fetching links[]"
-    else
+    if [[ "$HIT" != "$u" ]]; then
         echo "[*] $u: POST /api/user (creating)"
         PAYLOAD=$(jq -n \
             --arg u "$u" \
@@ -269,25 +267,42 @@ for u in "${TO_FETCH[@]}"; do
                 data_limit_reset_strategy: $strategy,
                 inbounds: { vless: [ $inbound ] }
             }')
-        curl -fsS -X POST "$PANEL/api/user" \
+        # Capture POST response + HTTP code so we can detect 422/409 cleanly.
+        POST_RESP=$(mktemp)
+        POST_CODE=$(curl -sS --max-time 15 -o "$POST_RESP" -w '%{http_code}' \
+            -X POST "$PANEL/api/user" \
             -H "Authorization: Bearer $ACCESS_TOKEN" \
             -H "Content-Type: application/json" \
-            --data "$PAYLOAD" 2>&1 \
-            | head -c 200
-        echo
+            --data "$PAYLOAD" 2>&1)
+        printf '   POST %s -> HTTP %s\n' "$PANEL/api/user" "$POST_CODE"
+        head -c 400 "$POST_RESP"
+        printf '\n'
+        rm -f "$POST_RESP"
+
+        if [[ "$POST_CODE" == "200" || "$POST_CODE" == "201" ]]; then
+            : # created
+        elif [[ "$POST_CODE" == "409" || "$POST_CODE" == "422" ]]; then
+            echo "[*]   (${POST_CODE}: user likely already exists; proceeding to read it)"
+        else
+            echo "[!] $u: POST failed (HTTP $POST_CODE); abort for this user." >&2
+            continue
+        fi
+
+        # Re-read to get fresh .links[]
+        USER_DATA=$(curl -fsS --max-time 15 -H "Authorization: Bearer $ACCESS_TOKEN" \
+            "$PANEL/api/user/$u" 2>&1) || {
+                echo "[!] Could not GET $u after POST" >&2
+                exit 1
+            }
+    else
+        echo "[*] $u: already exists on Marzban"
     fi
 
-    # Fetch vless:// from .links[]
-    USER_DATA=$(curl -fsS -H "Authorization: Bearer $ACCESS_TOKEN" \
-        "$PANEL/api/user/$u" 2>&1) || {
-            echo "[!] Could not GET $u" >&2
-            exit 1
-        }
     LINKS=$(printf '%s' "$USER_DATA" | jq -r '.links[]?' 2>/dev/null | grep '^vless://' || true)
 
     if [[ -z "$(printf '%s' "$LINKS" | tr -d '[:space:]')" ]]; then
         echo "[!] No vless:// from .links[] for $u" >&2
-        printf '    user data: %s\n' "$USER_DATA" | head -c 400 >&2
+        printf '    user data head: %s\n' "$USER_DATA" | head -c 400 >&2
         exit 1
     fi
 
@@ -312,9 +327,9 @@ for u in "${TO_FETCH[@]}"; do
     remote_dir="$DATA_DIR/$u/foreign"
     remote_dst="$remote_dir/$REMOTE_FILENAME"
     remote_tmp="$remote_dir/.$REMOTE_FILENAME.tmp.$$"
-    ssh "$NETHER_HOST" "set -e; mkdir -p $(sq "$remote_dir"); test ! -e $(sq "$remote_dst")"
-    ssh "$NETHER_HOST" "set -e; umask 077; cat > $(sq "$remote_tmp")" < "$conf"
-    ssh "$NETHER_HOST" "set -e; test ! -e $(sq "$remote_dst"); mv $(sq "$remote_tmp") $(sq "$remote_dst")"
+    ssh -o ConnectTimeout=10 -o BatchMode=yes "$NETHER_HOST" "set -e; mkdir -p $(sq "$remote_dir"); test ! -e $(sq "$remote_dst")"
+    ssh -o ConnectTimeout=10 -o BatchMode=yes "$NETHER_HOST" "set -e; umask 077; cat > $(sq "$remote_tmp")" < "$conf"
+    ssh -o ConnectTimeout=10 -o BatchMode=yes "$NETHER_HOST" "set -e; test ! -e $(sq "$remote_dst"); mv $(sq "$remote_tmp") $(sq "$remote_dst")"
     echo "    [OK] $u -> $remote_dst"
 done
 
@@ -332,4 +347,4 @@ fi
 
 echo "[*] Running buildvpn..."
 cd_esc=$(printf '%s' "$DATA_DIR" | sed "s/'/'\\\\''/g")
-ssh -tt "$NETHER_HOST" "bash -ic 'cd ${cd_esc} && ${BUILD_CMD}'"
+ssh -tt -o ConnectTimeout=10 -o ServerAliveInterval=15 "$NETHER_HOST" "bash -ic 'cd ${cd_esc} && ${BUILD_CMD}'"
