@@ -121,9 +121,22 @@ sq() { printf "'"; printf "%s" "$1" | sed "s/'/'\\\\''/g"; printf "'"; }
 # 1) Ask panel + admin + password (only what's missing)
 ask PANEL "Marzban panel URL, e.g. https://mirror.uvx.lol (no /api)"
 [[ -z "$PANEL" && -z "${DRY_RUN+x}" ]] && { echo "[!] panel URL required" >&2; exit 1; }
-PANEL="${PANEL%/}"
-[[ -n "$PANEL" ]] && if ! [[ "$PANEL" =~ ^https?:// ]]; then
-    echo "[!] not an http(s) URL: $PANEL" >&2; exit 1
+if [[ -n "$PANEL" ]]; then
+    if ! [[ "$PANEL" =~ ^https?:// ]]; then
+        echo "[!] not an http(s) URL: $PANEL" >&2; exit 1
+    fi
+    # Strip anything past host:port. Marzban /api lives at the bare origin
+    # even when there's a web-mordа tenant prefix.
+    ORIGIN=$(printf '%s' "$PANEL" | grep -oE 'https?://[^/]+' | head -1)
+    if [[ -z "$ORIGIN" ]]; then
+        echo "[!] could not parse host:port from $PANEL" >&2
+        exit 1
+    fi
+    if [[ "$ORIGIN" != "$PANEL" ]]; then
+        echo "[*] Stripping path -> using $ORIGIN (panel URL path is ignored;"
+        echo "    /api lives at the bare origin regardless of web-mordа prefix)"
+    fi
+    PANEL="$ORIGIN"
 fi
 ask ADMIN_USER "Marzban admin / sudoer username"
 [[ -z "$ADMIN_USER" && -z "${DRY_RUN+x}" ]] && { echo "[!] admin user required" >&2; exit 1; }
