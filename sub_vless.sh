@@ -134,6 +134,23 @@ done
 
 sq() { printf "'"; printf "%s" "$1" | sed "s/'/'\\\\''/g"; printf "'"; }
 
+# ===========================================================
+# SSH Multiplexing (speeds up multiple connections and prevents fail2ban/rate-limiting)
+# ===========================================================
+TMP_SSH_DIR="$(mktemp -d)"
+trap 'rm -rf "$TMP_SSH_DIR"' EXIT
+
+SSH_OPTS=(
+    -o ControlMaster=auto
+    -o ControlPersist=5m
+    -o ControlPath="$TMP_SSH_DIR/mux_%C"
+    -o ConnectTimeout=10
+)
+
+ssh_cmd() {
+    ssh "${SSH_OPTS[@]}" "$NETHER_HOST" "$@"
+}
+
 # 1) Ask panel + admin + password (only what's missing)
 ask PANEL "Marzban panel URL (no /api)"
 # Ask filename early (before any ssh/api side-effects).
@@ -178,7 +195,7 @@ if [[ -n "${USERS_OVERRIDE:-}" ]]; then
 else
     echo "[*] Reading users from $NETHER_HOST..."
     mapfile -t USERS < <(
-        ssh -o ConnectTimeout=10 -o BatchMode=yes "$NETHER_HOST" "cd $(sq "$DATA_DIR") && find . -mindepth 1 -maxdepth 1 -type d ! -name '.*' -printf '%f\n'" \
+        ssh_cmd "cd $(sq "$DATA_DIR") && find . -mindepth 1 -maxdepth 1 -type d ! -name '.*' -printf '%f\n'" \
             || { echo "[!] ssh failed" >&2; exit 1; } \
             | LC_ALL=C sort
     )
@@ -238,8 +255,8 @@ fi
 # 4) Pre-flight: refuse to overwrite remote files
 echo "[*] Pre-flight: refusing to overwrite remote files"
 EXISTING_REMOTE=()
-for u in "${TO_FETCH[@]}"; do
-    if ssh -o ConnectTimeout=10 -o BatchMode=yes "$NETHER_HOST" "test -e $(sq "$DATA_DIR/$u/foreign/$REMOTE_FILENAME")" 2>/dev/null; then
+for u in "${USERS[@]}"; do
+    if ssh_cmd "test -e $(sq "$DATA_DIR/$u/foreign/$REMOTE_FILENAME")" 2>/dev/null; then
         EXISTING_REMOTE+=("$DATA_DIR/$u/foreign/$REMOTE_FILENAME")
     fi
 done
@@ -447,9 +464,9 @@ for u in "${TO_FETCH[@]}"; do
     remote_dir="$DATA_DIR/$u/foreign"
     remote_dst="$remote_dir/$REMOTE_FILENAME"
     remote_tmp="$remote_dir/.$REMOTE_FILENAME.tmp.$$"
-    ssh -o ConnectTimeout=10 -o BatchMode=yes "$NETHER_HOST" "set -e; mkdir -p $(sq "$remote_dir"); test ! -e $(sq "$remote_dst")"
-    ssh -o ConnectTimeout=10 -o BatchMode=yes "$NETHER_HOST" "set -e; umask 077; cat > $(sq "$remote_tmp")" < "$conf"
-    ssh -o ConnectTimeout=10 -o BatchMode=yes "$NETHER_HOST" "set -e; test ! -e $(sq "$remote_dst"); mv $(sq "$remote_tmp") $(sq "$remote_dst")"
+    ssh_cmd "set -e; mkdir -p $(sq "$remote_dir"); test ! -e $(sq "$remote_dst")"
+    ssh_cmd "set -e; umask 077; cat > $(sq "$remote_tmp")" < "$conf"
+    ssh_cmd "set -e; test ! -e $(sq "$remote_dst"); mv $(sq "$remote_tmp") $(sq "$remote_dst")"
     echo "    [OK] $u -> $remote_dst"
 done
 
@@ -467,4 +484,4 @@ fi
 
 echo "[*] Running buildvpn..."
 cd_esc=$(printf '%s' "$DATA_DIR" | sed "s/'/'\\\\''/g")
-ssh -tt -o ConnectTimeout=10 -o ServerAliveInterval=15 "$NETHER_HOST" "bash -ic 'cd ${cd_esc} && ${BUILD_CMD}'"
+ssh_cmd -tt -o ServerAliveInterval=15 "bash -ic 'cd ${cd_esc} && ${BUILD_CMD}'"
