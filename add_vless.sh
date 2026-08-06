@@ -2,7 +2,7 @@
 # add_vless.sh — добавить vless-ноду ОДНОМУ юзеру.
 #
 # Поддерживает два режима ввода:
-#   1) Sub URL (например, https://mirror.uvx.lol/<token>) —
+#   1) Sub URL (например, https://<panel>/<token>) —
 #      скрипт сам curl'ит с User-Agent: clash.meta, base64/Clash-YAML
 #      декодирует, вытаскивает vless://, сохраняет локально и раскладывает.
 #   2) Прямой vless:// (одна или несколько строк в stdin) — сохраняет как есть.
@@ -157,7 +157,7 @@ esac
 if [[ "$DRY_RUN" -eq 0 ]] && have_tty && [[ -z "$SUB_URL" && $FROM_STDIN -eq 0 ]]; then
     echo
     echo "Choose input mode:"
-    echo "  1) Sub URL (Marzban https://mirror.uvx.lol/<token>) [default]"
+    echo "  1) Sub URL (Marzban-style https://<host>/<token>) [default]"
     echo "  2) Direct vless:// lines from stdin"
     read -rp "Choose [1/2]: " MODE_CHOICE <&3
     case "$MODE_CHOICE" in

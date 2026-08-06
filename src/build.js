@@ -717,8 +717,10 @@ async function buildAll() {
       ruPackages
     );
 
-    // Вшиваем имя профиля прямо в YAML (поддерживается многими клиентами)
-    masterConfig['profile-name'] = 'uvx.lol VPN';
+    // Вшиваем имя профиля прямо в YAML (поддерживается многими клиентами).
+    // Default is neutral; override via env PROFILE_NAME=<my-vpn> if you
+    // want a custom name in your client UI.
+    masterConfig['profile-name'] = process.env.PROFILE_NAME || 'Subscription Manager';
 
     // --- ПОЛЬЗОВАТЕЛЬСКИЕ ПЕРЕОПРЕДЕЛЕНИЯ (custom.yaml) ---
     const customPath = path.join(userDir, 'custom.yaml');

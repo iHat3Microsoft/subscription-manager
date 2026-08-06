@@ -127,7 +127,7 @@ done
 sq() { printf "'"; printf "%s" "$1" | sed "s/'/'\\\\''/g"; printf "'"; }
 
 # 1) Ask panel + admin + password (only what's missing)
-ask PANEL "Marzban panel URL, e.g. https://mirror.uvx.lol (no /api)"
+ask PANEL "Marzban panel URL (no /api)"
 # Ask filename early (before any ssh/api side-effects).
 if [[ -z "$REMOTE_FILENAME" ]]; then
     echo
