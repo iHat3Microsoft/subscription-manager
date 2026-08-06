@@ -1,12 +1,16 @@
 #!/usr/bin/env bash
-# sub_vless.sh — кладёт vless://-ключи из out_keys/<server-alias>/<user>.vless
-# в data/<user>/foreign/<remote-filename>.txt на удалённом сервере и
-# запускает buildvpn.
+# sub_vless.sh — зеркало sub.sh для vless-ключей.
 #
-# Зеркало sub.sh для vless, но **source of truth — локальная папка**:
-# список юзеров берётся из ./out_keys/<alias>/*.vless (без ssh-enumeration).
+# Логика (клон sub.sh):
+#   1) ssh на NETHER_HOST: читает data/<user>/ папки (список юзеров).
+#   2) Если нет --reuse-local — спрашивает panel/admin/inbound/limit/expire
+#      и запускает gen_vless.sh <server-alias> <user1> <user2> ...
+#      с этим списком (сгенерит ./out_keys/<alias>/<user>.vless).
+#   3) Для каждого юзера кладёт ./out_keys/<server>/<user>.vless
+#      в data/<user>/foreign/<remote-filename>.txt на удалёнке.
+#   4) Запускает buildvpn на удалёнке (если не --skip-build).
 #
-# Зависимости: bash, ssh, scp.
+# Зависимости: bash, ssh, jq, curl (нужны для gen_vless.sh при запуске).
 set -euo pipefail
 
 SCRIPT_NAME=$(basename "$0")
@@ -14,43 +18,65 @@ SCRIPT_NAME=$(basename "$0")
 NETHER_HOST="${NETHER_HOST:-nether2}"
 DATA_DIR="${DATA_DIR:-/opt/subscription-manager/data}"
 BUILD_CMD="${BUILD_CMD:-buildvpn}"
-LOCAL_OUT_DIR_BASE="./out_keys"
+LOCAL_OUT_DIR="./out_keys"
+GEN_SCRIPT="${GEN_SCRIPT:-./gen_vless.sh}"
 
 DRY_RUN=0
 SKIP_BUILD=0
+REUSE_LOCAL=0
 REMOTE_FILENAME=""
 USERS_OVERRIDE=""
+
+# Args, прокидываемые в gen_vless.sh при запуске
+GEN_PANEL=""
+GEN_ADMIN=""
+GEN_INBOUND=""
+GEN_LIMIT_GB=0
+GEN_EXPIRE_DAYS=0
+GEN_RESET_STRATEGY=""
+GEN_FLOW=""
+GEN_OUT_DIR=""
+GEN_PASSWORD_ENV=""
 
 usage() {
     cat <<EOF
 Usage:
-  $SCRIPT_NAME [options] [<server-alias>]
+  $SCRIPT_NAME [options] <vpn-server-alias>
 
 Example:
-  $SCRIPT_NAME                                   # спросит всё интерактивно
   $SCRIPT_NAME marzban1
-  $SCRIPT_NAME --name 'Marzban.txt' marzban1
-  $SCRIPT_NAME --dry-run --name 'Marzban.txt' marzban1
+  $SCRIPT_NAME --name 'Швеция1гбитVLESS.txt' marzban1
+  $SCRIPT_NAME --dry-run --name 'Швеция1гбитVLESS.txt' marzban1
+  $SCRIPT_NAME --reuse-local --skip-build --name 'Marzban.txt' marzban1
 
 Options:
-  --nether HOST        Subscription-manager SSH alias, default: nether2
-  --data-dir PATH      Remote data dir, default: /opt/subscription-manager/data
-  --name FILENAME      Remote filename in foreign/ for every user
-                       (e.g. Marzban.txt)
-  --build-cmd CMD      Remote build command, default: buildvpn
-  --local-out DIR      Base dir with generated keys, default: ./out_keys
-                       Keys taken from <DIR>/<server-alias>/<user>.vless
-  --users "u1 u2 ..."  Restrict to a subset of users present locally
-  --skip-build         Do not run buildvpn after upload
-  --dry-run            Only show what would be done
-  -h, --help           Show this help
+  --nether HOST         Subscription-manager SSH alias, default: nether2
+  --data-dir PATH       Remote data dir, default: /opt/subscription-manager/data
+  --name FILENAME       Remote filename in foreign/, e.g. 'Швеция1гбитVLESS.txt'
+                        If omitted, asked interactively.
+  --users "u1 u2 ..."   Override user list (skip ssh enumeration; useful for
+                        --dry-run without ssh access to nether)
+  --gen-script PATH     Local generator script, default: ./gen_vless.sh
+  --build-cmd CMD       Remote build command, default: buildvpn
+  --local-out DIR       Base dir for outputs, default: ./out_keys
+                        Keys live in <DIR>/<server-alias>/<user>.vless
+  --reuse-local         Skip gen_vless.sh; require ./out_keys/<alias>/<user>.vless
+                        to already exist for every remote user.
+  --skip-build          Do not run buildvpn after upload
+  --dry-run             Only show what would be done
 
-Behavior:
-  * User list is taken from \$OUT_DIR/<alias>/*.vless (default).
-    Pass --users to restrict; missing-from-disk users are skipped with a warning,
-    not an error.
-  * If a remote data/<u>/foreign/<name>.txt already exists, abort the
-    whole batch (no overwrite).
+Options passed through to gen_vless.sh (only used without --reuse-local):
+  --panel URL            Marzban panel URL
+  --admin USERNAME       Marzban admin username
+  --inbound TAG          Default: VLESS TCP VISION REALITY
+  --limit-gb N           Data limit per user, default 0 (unlimited)
+  --expire-days N        Account lifetime, default 0 (no expiry)
+  --reset-strategy KEY   Default: day
+  --flow NAME            Default: xtls-rprx-vision
+  --out-dir DIR          Default: matches --local-out
+  --password-env VAR     Env var holding admin password (skips interactive prompt)
+
+  -h, --help             Show this help
 EOF
 }
 
@@ -68,17 +94,25 @@ while [[ $# -gt 0 ]]; do
             REMOTE_FILENAME="${2:?missing filename}"
             shift 2
             ;;
+        --gen-script)
+            GEN_SCRIPT="${2:?missing gen script}"
+            shift 2
+            ;;
         --build-cmd)
             BUILD_CMD="${2:?missing build cmd}"
             shift 2
             ;;
         --local-out)
-            LOCAL_OUT_DIR_BASE="${2:?missing local out dir}"
+            LOCAL_OUT_DIR="${2:?missing local out dir}"
             shift 2
             ;;
         --users)
             USERS_OVERRIDE="${2:?missing users}"
             shift 2
+            ;;
+        --reuse-local)
+            REUSE_LOCAL=1
+            shift
             ;;
         --skip-build)
             SKIP_BUILD=1
@@ -87,6 +121,42 @@ while [[ $# -gt 0 ]]; do
         --dry-run)
             DRY_RUN=1
             shift
+            ;;
+        --panel)
+            GEN_PANEL="${2:?missing panel}"
+            shift 2
+            ;;
+        --admin)
+            GEN_ADMIN="${2:?missing admin}"
+            shift 2
+            ;;
+        --inbound)
+            GEN_INBOUND="${2:?missing inbound}"
+            shift 2
+            ;;
+        --limit-gb)
+            GEN_LIMIT_GB="${2:?missing gb}"
+            shift 2
+            ;;
+        --expire-days)
+            GEN_EXPIRE_DAYS="${2:?missing days}"
+            shift 2
+            ;;
+        --reset-strategy)
+            GEN_RESET_STRATEGY="${2:?missing strategy}"
+            shift 2
+            ;;
+        --flow)
+            GEN_FLOW="${2:?missing flow}"
+            shift 2
+            ;;
+        --out-dir)
+            GEN_OUT_DIR="${2:?missing out-dir}"
+            shift 2
+            ;;
+        --password-env)
+            GEN_PASSWORD_ENV="${2:?missing var name}"
+            shift 2
             ;;
         -h|--help)
             usage
@@ -104,65 +174,14 @@ while [[ $# -gt 0 ]]; do
 done
 
 SERVER_ALIAS="${1:-}"
-
-if [[ -z "$SERVER_ALIAS" && -n "$USERS_OVERRIDE" && -d "$LOCAL_OUT_DIR_BASE" ]]; then
-    mapfile -t WANTED_USERS < <(printf '%s\n' "$USERS_OVERRIDE" | tr ' ' '\n' | sed '/^$/d')
-    if [[ "${#WANTED_USERS[@]}" -gt 0 ]]; then
-        for d in "$LOCAL_OUT_DIR_BASE"/*; do
-            [[ -d "$d" ]] || continue
-            ok=1
-            for u in "${WANTED_USERS[@]}"; do
-                if [[ ! -e "$d/${u}.vless" ]]; then
-                    ok=0
-                    break
-                fi
-            done
-            if [[ $ok -eq 1 ]]; then
-                SERVER_ALIAS=$(basename "$d")
-                echo "[*] Auto-detected server alias (${#WANTED_USERS[@]} user(s) all present): $SERVER_ALIAS"
-                break
-            fi
-        done
-    fi
-fi
-
-if [[ -z "$SERVER_ALIAS" ]]; then
-    if [[ -d "$LOCAL_OUT_DIR_BASE" ]]; then
-        sub_count=0
-        sub_only=""
-        for d in "$LOCAL_OUT_DIR_BASE"/*; do
-            [[ -d "$d" ]] || continue
-            sub_count=$((sub_count + 1))
-            sub_only="$d"
-        done
-        if [[ $sub_count -eq 1 ]]; then
-            SERVER_ALIAS=$(basename "$sub_only")
-            echo "[*] Auto-detected server alias (only subdir): $SERVER_ALIAS"
-        fi
-    fi
-fi
-
 if [[ -z "$SERVER_ALIAS" ]]; then
     echo "[!] Server alias is required." >&2
-    if [[ -d "$LOCAL_OUT_DIR_BASE" ]]; then
-        echo "[!] Subdirs under $LOCAL_OUT_DIR_BASE:" >&2
-        for d in "$LOCAL_OUT_DIR_BASE"/*; do
-            [[ -d "$d" ]] || continue
-            cnt=$(find "$d" -maxdepth 1 -type f -name '*.vless' | wc -l)
-            printf '    %s -> %d .vless file(s)\n' "$(basename "$d")" "$cnt" >&2
-        done
-        if [[ -n "$USERS_OVERRIDE" ]]; then
-            echo "[!] No subdir had every requested user." >&2
-        fi
-    fi
-    if [[ "$DRY_RUN" -eq 0 ]] && { exec 3</dev/tty; } 2>/dev/null; then
-        echo
-        read -rp "Server alias (folder under $LOCAL_OUT_DIR_BASE): " SERVER_ALIAS <&3
-    fi
+    usage >&2
+    exit 1
 fi
 
-if [[ -z "$SERVER_ALIAS" ]]; then
-    usage >&2
+if [[ ! "$SERVER_ALIAS" =~ ^[A-Za-z0-9._-]+$ ]]; then
+    echo "[!] Server alias must match ^[A-Za-z0-9._-]+\$" >&2
     exit 1
 fi
 
@@ -195,78 +214,48 @@ ssh_nether() {
     ssh "$NETHER_HOST" "$@"
 }
 
-LOCAL_OUT_DIR="$LOCAL_OUT_DIR_BASE/$SERVER_ALIAS"
-
 echo "[*] Server alias:       $SERVER_ALIAS"
 echo "[*] Subscription host:  $NETHER_HOST"
 echo "[*] Data dir:           $DATA_DIR"
-echo "[*] Local keys dir:     $LOCAL_OUT_DIR"
-echo "[*] Remote filename:    $REMOTE_FILENAME"
+echo "[*] Local keys dir:     $LOCAL_OUT_DIR/$SERVER_ALIAS"
+echo "[*] Foreign filename:   $REMOTE_FILENAME"
+if [[ $REUSE_LOCAL -eq 1 ]]; then
+    echo "[*] Reuse-local:        yes (skip gen_vless.sh)"
+else
+    echo "[*] Reuse-local:        no  (will run $GEN_SCRIPT)"
+fi
 echo
 
-if [[ ! -d "$LOCAL_OUT_DIR" ]]; then
-    echo "[!] Local keys dir not found: $LOCAL_OUT_DIR" >&2
-    echo "    Run gen_vless.sh $SERVER_ALIAS <users> first." >&2
-    exit 1
-fi
-
-mapfile -t ALL_LOCAL_FILES < <(find "$LOCAL_OUT_DIR" -maxdepth 1 -type f -name '*.vless' | LC_ALL=C sort)
-
-if [[ "${#ALL_LOCAL_FILES[@]}" -eq 0 ]]; then
-    echo "[!] No .vless files in $LOCAL_OUT_DIR" >&2
-    echo "    Run gen_vless.sh $SERVER_ALIAS <users> first." >&2
-    exit 1
-fi
-
-declare -A LOCAL_USERS=()
-for f in "${ALL_LOCAL_FILES[@]}"; do
-    base=$(basename "$f" .vless)
-    LOCAL_USERS["$base"]="$f"
-done
-
-declare -A USERS_SET=()
 if [[ -n "$USERS_OVERRIDE" ]]; then
-    mapfile -t WANTED_USERS < <(printf '%s\n' "$USERS_OVERRIDE" | tr ' ' '\n' | sed '/^$/d')
-    for u in "${WANTED_USERS[@]}"; do
-        USERS_SET["$u"]=1
-    done
-fi
-
-USERS=()
-SKIPPED_NO_KEY=()
-for u in "${!LOCAL_USERS[@]}"; do
-    if [[ ${#USERS_SET[@]} -gt 0 && -z "${USERS_SET[$u]:-}" ]]; then
-        continue
-    fi
-    if [[ ! "$u" =~ ^[A-Za-z0-9._-]+$ ]]; then
-        echo "[!] Bad local filename: $u.vless" >&2
+    mapfile -t USERS < <(printf '%s\n' "$USERS_OVERRIDE" | tr ' ' '\n' | sed '/^$/d')
+    echo "[*] Using --users override: ${#USERS[@]} user(s)"
+else
+    echo "[*] Reading users from $NETHER_HOST..."
+    mapfile -t USERS < <(
+        ssh_nether "cd $(sq "$DATA_DIR") && find . -mindepth 1 -maxdepth 1 -type d ! -name '.*' -printf '%f\n' | LC_ALL=C sort"
+    ) || {
+        echo "[!] Could not list users on $NETHER_HOST:$DATA_DIR" >&2
+        echo "    Use --users 'u1 u2 ...' for offline testing / --dry-run." >&2
         exit 1
-    fi
-    f="${LOCAL_USERS[$u]}"
-    if [[ ! -s "$f" ]]; then
-        SKIPPED_NO_KEY+=("$u (empty $f)")
-        continue
-    fi
-    USERS+=("$u")
-done
-
-if [[ "${#SKIPPED_NO_KEY[@]}" -gt 0 ]]; then
-    echo "[*] Skipping empty local files:" >&2
-    printf '    %s\n' "${SKIPPED_NO_KEY[@]}" >&2
+    }
 fi
 
 if [[ "${#USERS[@]}" -eq 0 ]]; then
-    echo "[!] No users with non-empty .vless files to upload." >&2
+    echo "[!] No users found." >&2
     exit 1
 fi
 
-IFS=$'\n' SORTED=( $(printf '%s\n' "${USERS[@]}" | LC_ALL=C sort) )
-USERS=("${SORTED[@]}")
-unset IFS
-
-echo "[*] Users to upload: ${#USERS[@]}"
+echo "[*] Found users: ${#USERS[@]}"
 printf '    %s\n' "${USERS[@]}"
 echo
+
+for u in "${USERS[@]}"; do
+    if [[ ! "$u" =~ ^[A-Za-z0-9._-]+$ ]]; then
+        echo "[!] User folder name is not suitable: $u" >&2
+        echo "    Allowed: letters, digits, dot, underscore, dash." >&2
+        exit 1
+    fi
+done
 
 echo "[*] Preflight: checking remote target files..."
 EXISTING_REMOTE=()
@@ -287,9 +276,18 @@ echo "[*] Preflight OK"
 echo
 
 if [[ "$DRY_RUN" -eq 1 ]]; then
+    if [[ $REUSE_LOCAL -eq 1 ]]; then
+        echo "[DRY-RUN] Would reuse existing local keys (skipping $GEN_SCRIPT)"
+    else
+        echo "[DRY-RUN] Would run:"
+        printf '    bash %q %q' "$GEN_SCRIPT" "$SERVER_ALIAS"
+        printf ' %q' "${USERS[@]}"
+        echo
+    fi
+    echo
     echo "[DRY-RUN] Would upload:"
     for u in "${USERS[@]}"; do
-        echo "    $LOCAL_OUT_DIR/${u}.vless -> $NETHER_HOST:$DATA_DIR/$u/foreign/$REMOTE_FILENAME"
+        echo "    $LOCAL_OUT_DIR/$SERVER_ALIAS/${u}.vless -> $NETHER_HOST:$DATA_DIR/$u/foreign/$REMOTE_FILENAME"
     done
     echo
     if [[ "$SKIP_BUILD" -eq 0 ]]; then
@@ -299,9 +297,61 @@ if [[ "$DRY_RUN" -eq 1 ]]; then
     exit 0
 fi
 
+if [[ $REUSE_LOCAL -eq 1 ]]; then
+    echo "[*] Reuse-local: skipping $GEN_SCRIPT"
+    MISSING_LOCAL=()
+    for u in "${USERS[@]}"; do
+        conf="$LOCAL_OUT_DIR/$SERVER_ALIAS/${u}.vless"
+        if [[ ! -s "$conf" ]]; then
+            MISSING_LOCAL+=("$u (missing $conf)")
+        fi
+    done
+    if [[ ${#MISSING_LOCAL[@]} -gt 0 ]]; then
+        echo "[!] --reuse-local: missing local generated files for:" >&2
+        printf '    %s\n' "${MISSING_LOCAL[@]}" >&2
+        echo "    Need $LOCAL_OUT_DIR/$SERVER_ALIAS/<user>.vless for every user." >&2
+        echo "    Drop --reuse-local to regenerate via gen_vless.sh." >&2
+        exit 1
+    fi
+else
+    if [[ ! -f "$GEN_SCRIPT" ]]; then
+        echo "[!] gen script not found: $GEN_SCRIPT" >&2
+        exit 1
+    fi
+
+    GEN_CMD=(bash "$GEN_SCRIPT")
+    [[ -n "$GEN_PANEL" ]]            && GEN_CMD+=(--panel "$GEN_PANEL")
+    [[ -n "$GEN_ADMIN" ]]            && GEN_CMD+=(--admin "$GEN_ADMIN")
+    [[ -n "$GEN_INBOUND" ]]          && GEN_CMD+=(--inbound "$GEN_INBOUND")
+    [[ -n "$GEN_RESET_STRATEGY" ]]   && GEN_CMD+=(--reset-strategy "$GEN_RESET_STRATEGY")
+    [[ -n "$GEN_FLOW" ]]             && GEN_CMD+=(--flow "$GEN_FLOW")
+    [[ -n "$GEN_PASSWORD_ENV" ]]     && GEN_CMD+=(--password-env "$GEN_PASSWORD_ENV")
+    [[ "$GEN_OUT_DIR" != "" ]]       && GEN_CMD+=(--out-dir "$GEN_OUT_DIR")
+    [[ "${GEN_LIMIT_GB:-0}" -gt 0 ]] && GEN_CMD+=(--limit-gb "$GEN_LIMIT_GB")
+    [[ "${GEN_EXPIRE_DAYS:-0}" -gt 0 ]] && GEN_CMD+=(--expire-days "$GEN_EXPIRE_DAYS")
+    GEN_CMD+=(--skip-existing)
+    GEN_CMD+=("$SERVER_ALIAS")
+    GEN_CMD+=("${USERS[@]}")
+
+    echo "[*] Generating vless configs with $GEN_SCRIPT..."
+    echo "    ${GEN_CMD[*]}"
+    echo
+    "${GEN_CMD[@]}"
+fi
+
+echo
+echo "[*] Checking generated configs..."
+for u in "${USERS[@]}"; do
+    conf="$LOCAL_OUT_DIR/$SERVER_ALIAS/${u}.vless"
+    if [[ ! -s "$conf" ]]; then
+        echo "[!] Missing generated vless: $conf" >&2
+        exit 1
+    fi
+done
+
 echo "[*] Uploading vless files to $NETHER_HOST..."
 for u in "${USERS[@]}"; do
-    local_file="$LOCAL_OUT_DIR/${u}.vless"
+    conf="$LOCAL_OUT_DIR/$SERVER_ALIAS/${u}.vless"
     remote_dir="$DATA_DIR/$u/foreign"
     remote_dst="$remote_dir/$REMOTE_FILENAME"
     remote_tmp="$remote_dir/.$REMOTE_FILENAME.tmp.$$"
@@ -309,7 +359,7 @@ for u in "${USERS[@]}"; do
     echo "    $u -> $remote_dst"
 
     ssh_nether "set -e; mkdir -p $(sq "$remote_dir"); test ! -e $(sq "$remote_dst")"
-    ssh_nether "set -e; umask 077; cat > $(sq "$remote_tmp")" < "$local_file"
+    ssh_nether "set -e; umask 077; cat > $(sq "$remote_tmp")" < "$conf"
     ssh_nether "set -e; test ! -e $(sq "$remote_dst"); mv $(sq "$remote_tmp") $(sq "$remote_dst")"
 done
 
