@@ -67,6 +67,7 @@ Options:
   --build-cmd CMD       Remote build command, default: $BUILD_CMD
   --name FILE           Remote filename in foreign/ (default: empty,
                         always asked interactively)
+  --users "U1 U2"       Restrict to these users instead of all remote users
   --mode [url|vless]    Output mode: 'url' (default) for subscription_url,
                         or 'vless' for raw vless:// strings.
   --panel URL           Marzban panel URL (no /api)
@@ -100,6 +101,8 @@ while [[ $# -gt 0 ]]; do
             MODE="${2:?missing}"; shift 2 ;;
         --name)
             REMOTE_FILENAME="${2:?missing}"; shift 2 ;;
+        --users)
+            USERS_OVERRIDE="${2:?missing}"; shift 2 ;;
         --panel)
             PANEL="${2:?missing}"; shift 2 ;;
         --admin)
@@ -173,12 +176,17 @@ ask ADMIN_USER "Marzban admin / sudoer username"
 [[ -z "$ADMIN_USER" && -z "${DRY_RUN+x}" ]] && { echo "[!] admin user required" >&2; exit 1; }
 
 # 2) Read remote user list
-echo "[*] Reading users from $NETHER_HOST..."
-mapfile -t USERS < <(
-    ssh -o ConnectTimeout=10 -o BatchMode=yes "$NETHER_HOST" "cd $(sq "$DATA_DIR") && find . -mindepth 1 -maxdepth 1 -type d ! -name '.*' -printf '%f\n'" \
-        || { echo "[!] ssh failed" >&2; exit 1; } \
-        | LC_ALL=C sort
-)
+if [[ -n "${USERS_OVERRIDE:-}" ]]; then
+    mapfile -t USERS < <(printf '%s\n' "$USERS_OVERRIDE" | tr ' ' '\n' | sed '/^$/d')
+    echo "[*] Using --users override: ${#USERS[@]} user(s)"
+else
+    echo "[*] Reading users from $NETHER_HOST..."
+    mapfile -t USERS < <(
+        ssh -o ConnectTimeout=10 -o BatchMode=yes "$NETHER_HOST" "cd $(sq "$DATA_DIR") && find . -mindepth 1 -maxdepth 1 -type d ! -name '.*' -printf '%f\n'" \
+            || { echo "[!] ssh failed" >&2; exit 1; } \
+            | LC_ALL=C sort
+    )
+fi
 
 if [[ "${#USERS[@]}" -eq 0 ]]; then
     echo "[!] No users in $NETHER_HOST:$DATA_DIR" >&2
