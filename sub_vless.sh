@@ -326,8 +326,16 @@ for u in "${TO_FETCH[@]}"; do
         # this run's panel matches. If you switched panel for a new server,
         # we don't want to upload keys from the old one.
         cached_panel=$(awk -F'# Panel:[[:space:]]*' '/^# Panel:/ {print $2; exit}' "$OUT_DIR/${u}.vless" 2>/dev/null || true)
+        cached_mode=$(awk -F'# Mode:[[:space:]]*' '/^# Mode:/ {print $2; exit}' "$OUT_DIR/${u}.vless" 2>/dev/null || true)
+        
+        # Older cached files might not have a Mode header, assume 'vless' if missing
+        [[ -z "$cached_mode" ]] && cached_mode="vless"
+
         if [[ -n "$cached_panel" && "$cached_panel" != "$PANEL" ]]; then
             echo "    cached file is from a different panel ($cached_panel); not reusing -- regenerating"
+            rm -f "$OUT_DIR/${u}.vless"
+        elif [[ "$cached_mode" != "$MODE" ]]; then
+            echo "    cached file is from a different mode ($cached_mode != $MODE); not reusing -- regenerating"
             rm -f "$OUT_DIR/${u}.vless"
         else
             echo "    cached locally (delete or pass --no-cache to refetch): $OUT_DIR/${u}.vless"
