@@ -186,8 +186,8 @@ if [[ ! "$SERVER_ALIAS" =~ ^[A-Za-z0-9._-]+$ ]]; then
 fi
 
 if [[ -z "$REMOTE_FILENAME" ]]; then
-    if [[ "$DRY_RUN" -eq 0 ]] && { exec 3</dev/tty; } 2>/dev/null; then
-        read -rp "Filename inside foreign/, e.g. Marzban.txt: " REMOTE_FILENAME <&3
+    if [[ "$DRY_RUN" -eq 0 ]] && [[ -t 0 ]]; then
+        read -rp "Filename inside foreign/, e.g. Marzban.txt: " REMOTE_FILENAME
     fi
 fi
 

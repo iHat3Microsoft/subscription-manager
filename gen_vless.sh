@@ -136,12 +136,12 @@ if [[ -z "$SERVER_ALIAS" ]]; then
         usage >&2
         exit 1
     fi
-    if ! { exec 3</dev/tty; } 2>/dev/null; then
-        echo "[!] Server alias is required (no TTY for prompt)." >&2
+    if [[ ! -t 0 ]]; then
+        echo "[!] Server alias is required (stdin not a TTY)." >&2
         usage >&2
         exit 1
     fi
-    read -rp "Marzban server alias (folder under $OUT_DIR, e.g. marzban1): " SERVER_ALIAS <&3
+    read -rp "Marzban server alias (folder under $OUT_DIR, e.g. marzban1): " SERVER_ALIAS
 fi
 
 if [[ -z "$SERVER_ALIAS" ]]; then
@@ -161,12 +161,12 @@ if [[ $# -lt 1 ]]; then
         usage >&2
         exit 1
     fi
-    if ! { exec 3</dev/tty; } 2>/dev/null; then
-        echo "[!] Need usernames (no TTY for prompt)." >&2
+    if [[ ! -t 0 ]]; then
+        echo "[!] Need usernames (stdin not a TTY)." >&2
         usage >&2
         exit 1
     fi
-    read -rp "Usernames (space-separated, e.g. 'alice bob' or 'user:5'): " USERS_LINE <&3
+    read -rp "Usernames (space-separated, e.g. 'alice bob' or 'user:5'): " USERS_LINE
     if [[ -z "$USERS_LINE" ]]; then
         echo "[!] Empty usernames." >&2
         exit 1
@@ -218,6 +218,10 @@ if [[ -n "$PANEL_URL" ]]; then
 fi
 
 if [[ -z "$PANEL_URL" ]]; then
+    if [[ ! -t 0 ]]; then
+        echo "[!] Panel URL is required (stdin not a TTY)." >&2
+        exit 1
+    fi
     read -rp "Marzban panel URL (e.g. https://marz.example.com): " PANEL_URL
     PANEL_URL="${PANEL_URL%/}"
     if [[ -z "$PANEL_URL" ]]; then
@@ -227,6 +231,10 @@ if [[ -z "$PANEL_URL" ]]; then
 fi
 
 if [[ -z "$ADMIN_USER" ]]; then
+    if [[ ! -t 0 ]]; then
+        echo "[!] Admin username is required (stdin not a TTY)." >&2
+        exit 1
+    fi
     read -rp "Admin username: " ADMIN_USER
     if [[ -z "$ADMIN_USER" ]]; then
         echo "[!] Empty admin username" >&2
@@ -296,13 +304,12 @@ if [[ -n "${!PASSWORD_ENV:-}" ]]; then
 fi
 
 if [[ -z "$ADMIN_PASS" ]]; then
-    if ! { exec 3</dev/tty; } 2>/dev/null; then
+    if [[ ! -t 0 ]]; then
         echo "[!] No TTY available; pass password via env var $PASSWORD_ENV." >&2
         exit 1
     fi
-    read -rsp "Admin password (input hidden): " ADMIN_PASS <&3
-    echo >&3
-    exec 3<&-
+    read -rsp "Admin password (input hidden): " ADMIN_PASS
+    echo
     if [[ -z "$ADMIN_PASS" ]]; then
         echo "[!] Empty password" >&2
         exit 1
