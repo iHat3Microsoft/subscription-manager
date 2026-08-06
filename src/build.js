@@ -157,15 +157,13 @@ function asProxyList(result, baseName) {
   if (!result) return [];
   const list = Array.isArray(result) ? result : [result];
   return list
-    .filter(p => p && typeof p === 'object' && p.name)
+    .filter(p => p && typeof p === 'object')
     .map((p, idx, arr) => {
-      // Keep Marzban-supplied names if present (they're already unique
-      // within one URL fetch); otherwise base-name them.
-      if (arr.length === 1) {
-        p.name = baseName;
-      } else if (!/^Marz|^🚀|^node-/.test(p.name || '')) {
-        // not a Marz node-named server; use base-N
-        p.name = `${baseName}-${idx + 1}`;
+      // Marzban (and other) come with their own names already
+      // (e.g. "🚀 Marz (Vasya) [VLESS - tcp]"); leave them alone.
+      // Fill in only if the upstream parser dropped a name.
+      if (!p.name) {
+        p.name = arr.length === 1 ? baseName : `${baseName}-${idx + 1}`;
       }
       return p;
     });
