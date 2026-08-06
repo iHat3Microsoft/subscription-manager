@@ -128,17 +128,50 @@ while [[ $# -gt 0 ]]; do
 done
 
 SERVER_ALIAS="${1:-}"
+shift 2>/dev/null || true
+
 if [[ -z "$SERVER_ALIAS" ]]; then
-    echo "[!] Server alias is required." >&2
+    if [[ "$DRY_RUN" -eq 1 ]]; then
+        echo "[!] Server alias is required even for --dry-run." >&2
+        usage >&2
+        exit 1
+    fi
+    if ! { exec 3</dev/tty; } 2>/dev/null; then
+        echo "[!] Server alias is required (no TTY for prompt)." >&2
+        usage >&2
+        exit 1
+    fi
+    read -rp "Marzban server alias (folder under $OUT_DIR, e.g. marzban1): " SERVER_ALIAS <&3
+fi
+
+if [[ -z "$SERVER_ALIAS" ]]; then
+    echo "[!] Empty server alias." >&2
     usage >&2
     exit 1
 fi
-shift
+
+if [[ ! "$SERVER_ALIAS" =~ ^[A-Za-z0-9._-]+$ ]]; then
+    echo "[!] Server alias must match ^[A-Za-z0-9._-]+\$" >&2
+    exit 1
+fi
 
 if [[ $# -lt 1 ]]; then
-    echo "[!] Need at least one username or prefix:count." >&2
-    usage >&2
-    exit 1
+    if [[ "$DRY_RUN" -eq 1 ]]; then
+        echo "[!] Need at least one username or prefix:count even for --dry-run." >&2
+        usage >&2
+        exit 1
+    fi
+    if ! { exec 3</dev/tty; } 2>/dev/null; then
+        echo "[!] Need usernames (no TTY for prompt)." >&2
+        usage >&2
+        exit 1
+    fi
+    read -rp "Usernames (space-separated, e.g. 'alice bob' or 'user:5'): " USERS_LINE <&3
+    if [[ -z "$USERS_LINE" ]]; then
+        echo "[!] Empty usernames." >&2
+        exit 1
+    fi
+    set -- $USERS_LINE
 fi
 
 USERS=()

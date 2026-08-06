@@ -140,9 +140,16 @@ if [[ -z "$SERVER_ALIAS" ]]; then
             printf '    %s -> %d .vless file(s)\n' "$(basename "$d")" "$cnt" >&2
         done
         if [[ -n "$USERS_OVERRIDE" ]]; then
-            echo "[!] Need --users list (?): no subdir had every requested user." >&2
+            echo "[!] No subdir had every requested user." >&2
         fi
     fi
+    if [[ "$DRY_RUN" -eq 0 ]] && { exec 3</dev/tty; } 2>/dev/null; then
+        echo
+        read -rp "Server alias (folder under $LOCAL_OUT_DIR_BASE): " SERVER_ALIAS <&3
+    fi
+fi
+
+if [[ -z "$SERVER_ALIAS" ]]; then
     usage >&2
     exit 1
 fi
