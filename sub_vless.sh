@@ -28,7 +28,7 @@ BUILD_CMD="${BUILD_CMD:-buildvpn}"
 OUT_DIR="${OUT_DIR:-./out_keys/vless}"
 REMOTE_FILENAME="${REMOTE_FILENAME:-Marzban.txt}"
 DRY_RUN=0
-SKIP_BUILD=1   # default: do NOT run buildvpn (run --build to override)
+SKIP_BUILD=0   # default: run buildvpn (run --skip-build to override)
 NO_CACHE=0      # by default: skip users whose local <u>.vless already exists
 MODE="url"      # default: save subscription_url instead of vless keys
 
@@ -80,8 +80,8 @@ Options:
                         local ./out_keys/<u>.vless; even if the cached
                         file is from a different panel, re-fetch from the
                         current one)
-  --skip-build          Do not run buildvpn (default: skip buildvpn)
-  --build               Run buildvpn after upload (overrides skip)
+  --skip-build          Do not run buildvpn after upload
+  --build               Run buildvpn after upload (now default)
   -h, --help            Show this help
 EOF
 }
