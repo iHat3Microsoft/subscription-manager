@@ -143,7 +143,7 @@ function parseMihomoVShareLink(rawUrl, scheme, { decodeBase64Host = false } = {}
 
   switch (network) {
     case 'tcp':
-      if (fakeType !== 'none') {
+      if (fakeType !== 'none' && fakeType !== '') {
         proxy['http-opts'] = { path: [p.get('path') || '/'], headers: {} };
         if (p.get('host')) proxy['http-opts'].headers.Host = [p.get('host')];
         if (p.get('method')) proxy['http-opts'].method = p.get('method');
