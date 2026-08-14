@@ -631,8 +631,6 @@ function generateConfig(userName, ruProviderUrl, foreignProviderUrl, excludePack
       'IP-CIDR,172.16.0.0/12,DIRECT,no-resolve',
       'AND,((NETWORK,tcp),(DST-PORT,22)),DIRECT',
       'PROCESS-NAME,ssh,DIRECT',
-      // Блокировка QUIC (UDP:443) — глобально, браузеры уходят на TCP
-      'AND,((NETWORK,UDP),(DST-PORT,443)),REJECT',
       'RULE-SET,geosite-youtube,▶️ YouTube',
       'OR,((RULE-SET,geosite-discord),(RULE-SET,discord_voiceips),(PROCESS-NAME,Discord.exe)),💬 Discord',
       'RULE-SET,discord_vc,💬 Discord',
