@@ -78,14 +78,19 @@ while [[ $# -gt 0 ]]; do
             exit 1
             ;;
         *)
-            break
+            if [[ -z "${VPN_SERVER:-}" ]]; then
+                VPN_SERVER="$1"
+                shift
+            else
+                echo "[!] Unexpected argument: $1"
+                usage
+                exit 1
+            fi
             ;;
     esac
 done
 
-VPN_SERVER="${1:-}"
-
-if [[ -z "$VPN_SERVER" ]]; then
+if [[ -z "${VPN_SERVER:-}" ]]; then
     usage
     exit 1
 fi
