@@ -541,7 +541,7 @@ function generateConfig(userName, ruProviderUrl, foreignProviderUrl, excludePack
         type: 'http',
         behavior: 'classical',
         format: 'yaml',
-        url: 'https://raw.githubusercontent.com/chm0d777/mihomo-config/main/my-rules.yaml',
+        url: 'https://gitlab.com/chm0d755/subscription-manager/-/raw/master/my-rules.yaml',
         path: './rule-sets/my-rules.yaml',
         interval: 86400
       },
