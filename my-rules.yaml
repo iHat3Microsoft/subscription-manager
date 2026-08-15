@@ -1,0 +1,94 @@
+payload:
+# 4PDA (форум и зеркала)
+- DOMAIN-KEYWORD,4pda
+- DOMAIN-SUFFIX,4pda.to
+- DOMAIN-SUFFIX,4pda.ru
+- DOMAIN-SUFFIX,4pda.org
+- DOMAIN-SUFFIX,4pda.club
+- DOMAIN-SUFFIX,4pda.info
+# Хабр (habrahabr, hubr, geektimes)
+- DOMAIN-KEYWORD,habr
+- DOMAIN-SUFFIX,habrahabr.ru
+- DOMAIN-SUFFIX,habrahabr.org
+- DOMAIN-SUFFIX,hubr.ru
+- DOMAIN-SUFFIX,geektimes.com
+# Lolz / Zelenka / LZT (все зеркала форума и маркета)
+- DOMAIN-KEYWORD,lolz
+- DOMAIN-KEYWORD,lzt
+- DOMAIN-SUFFIX,lolz.guru
+- DOMAIN-SUFFIX,lolz.market
+- DOMAIN-SUFFIX,lolz.live
+- DOMAIN-SUFFIX,lolz.online
+- DOMAIN-SUFFIX,lolzteam.net
+- DOMAIN-SUFFIX,lzt.market
+- DOMAIN-SUFFIX,lzt.su
+- DOMAIN-SUFFIX,zelenka.guru
+- DOMAIN-SUFFIX,zelenka.market
+- DOMAIN-SUFFIX,zelenka.su
+- DOMAIN-SUFFIX,syntx.ai
+- DOMAIN-SUFFIX,kali.org
+# Arch Linux / Pacman обновления
+- DOMAIN-SUFFIX,omarchy.org
+- DOMAIN-SUFFIX,stable-mirror.omarchy.org
+- DOMAIN-SUFFIX,pkgs.omarchy.org
+- DOMAIN-SUFFIX,repo.omarchy.org
+- DOMAIN-SUFFIX,archlinux.org
+- DOMAIN-SUFFIX,pkgbuild.com
+- DOMAIN-SUFFIX,archlinuxcn.org
+- DOMAIN-KEYWORD,archlinux
+- DOMAIN-SUFFIX,kernel.org
+- DOMAIN-SUFFIX,canirun.ai
+
+# Cisco
+- DOMAIN-SUFFIX,momentjs.com
+
+# Test DNS, WEBRTC
+- DOMAIN-SUFFIX,browserleaks.com
+- DOMAIN-SUFFIX,dnsleaktest.com
+# Инстансы cobalt.tools (скачивание видео)
+- DOMAIN-SUFFIX,cobalt.directory
+- DOMAIN-SUFFIX,cobalt.canine.tools
+- DOMAIN-KEYWORD,cobalt
+# Vivaldi Browser
+- DOMAIN-SUFFIX,forum.vivaldi.net
+- DOMAIN-SUFFIX,vivaldi.net
+# AHA-MUSIC
+- DOMAIN-SUFFIX,aha-music.com
+- DOMAIN-SUFFIX,ezojs.com
+- DOMAIN-SUFFIX,ezoicanalytics.com
+- DOMAIN-SUFFIX,extension.doreso.com
+# Хостеры
+- DOMAIN-SUFFIX,llhost # LLhost
+- DOMAIN-SUFFIX,greencloudvps.com
+# Motorola / Lenovo
+- DOMAIN-SUFFIX,motorola.com # motorola
+- DOMAIN-KEYWORD,motorola # motorola
+- GEOSITE,lenovo # lenovo
+# Niagara Launcher
+- DOMAIN-SUFFIX,niagaralauncher.app
+- DOMAIN-SUFFIX,niagaralauncher.com
+- DOMAIN-KEYWORD,niagaralauncher
+- DOMAIN-SUFFIX,featurebase.app
+- DOMAIN-SUFFIX,auth.featurebase.app
+# Разное
+- DOMAIN-SUFFIX,ifixit.com # Гайды по ремонту
+- DOMAIN-SUFFIX,softpedia.com # Сайт с программами
+- DOMAIN-SUFFIX,iconarchive.com # Набор иконок. Бесполезный сайт.
+- DOMAIN-SUFFIX,ragnos1997.com # Оптимизация игр
+- DOMAIN-SUFFIX,queue-it.net # Управление онлайн-очередями. Сервисный сайт.
+- GEOSITE,sourceforge # Open source ПО
+- DOMAIN-SUFFIX,steamdb.info # steamdb
+- DOMAIN-SUFFIX,moddb.com # моды
+- DOMAIN-SUFFIX,tampermonkey.net # tampermonkey.net
+- DOMAIN-SUFFIX,ua # тест на ua ???
+- DOMAIN-SUFFIX,linktr.ee # linktr. аггрегатор ссылок на socials
+- GEOSITE,google-play # google-play
+- DOMAIN-SUFFIX,wallhaven.cc # обои на Android
+- DOMAIN-SUFFIX,alternativeto.net # поиск программ
+- DOMAIN-SUFFIX,worldcat.org # это крупнейший в мире сводный электронный каталог библиотек, объединяющий ресурсы более 72 000 библиотек из 170 стран. Он позволяет искать книги, музыкальные записи, фильмы, статьи и другие материалы (более 500 млн записей) в ближайших библиотеках, а также находить редкие издания.
+- DOMAIN-SUFFIX,ets2.lt # моды ETS2
+- DOMAIN-SUFFIX,mods.to # моды ETS2
+
+# Rutracker
+- DOMAIN-SUFFIX,rutracker.org
+- DOMAIN-KEYWORD,rutracker
