@@ -84,14 +84,7 @@ async function parseProxy(content, baseName) {
   const urlProxy = await parsers.parseProxyUrl(content);
   if (urlProxy) return urlProxy;
 
-  // If it's a raw .conf file text (like standard Wireguard/AmneziaWG)
-  // We can wrap it in a mock JSON structure to feed it to our parser, or 
-  // we can manually parse it if needed. For now, since the user said 
-  // AmneziaWG gives JSON keys, we rely on JSON.
-  // Wait! A .conf file is INI format. The frontend didn't natively parse pure INI without the json wrapper.
-  // If we need pure .conf parsing, we can add it here.
-
-  // Try raw WG/AWG .conf format
+  // Raw WG/AWG .conf file (INI format)
   if (content.includes('[Interface]') && content.includes('[Peer]')) {
     return parsers.parseWireGuardConfig(content);
   }
@@ -719,7 +712,7 @@ async function buildAll() {
       token = fs.readFileSync(tokenFile, 'utf-8').trim();
     } else {
       token = crypto.randomBytes(16).toString('hex');
-      fs.writeFileSync(tokenFile, token);
+      fs.writeFileSync(tokenFile, token, { mode: 0o600 });
       console.log(`[Info] Generated new secure token for user: ${user}`);
     }
 
