@@ -169,17 +169,8 @@ function asProxyList(result, baseName) {
     });
 }
 
-// Generate the complete Mihomo config template for a user
-function generateConfig(userName, ruProviderUrl, foreignProviderUrl, excludePackages = []) {
+function buildDns() {
   return {
-    mode: 'rule',
-    ipv6: false,
-    'log-level': 'info',
-    'allow-lan': false,
-    'unified-delay': true,
-    'tcp-concurrent': true,
-
-    dns: {
       enable: true,
       listen: '127.0.0.1:6868',
       ipv6: false,
@@ -201,9 +192,11 @@ function generateConfig(userName, ruProviderUrl, foreignProviderUrl, excludePack
       'nameserver-policy': {
         'geosite:category-ru': ['77.88.8.8', '8.8.8.8']
       }
-    },
+    };
+}
 
-    tun: {
+function buildTun(excludePackages) {
+  return {
       enable: true,
       stack: 'mixed',
       'auto-route': true,
@@ -217,9 +210,11 @@ function generateConfig(userName, ruProviderUrl, foreignProviderUrl, excludePack
         '224.0.0.0/3', '::/127', 'fc00::/7', 'fe80::/10', 'ff00::/8'
       ],
       'exclude-package': excludePackages
-    },
+    };
+}
 
-    sniffer: {
+function buildSniffer() {
+  return {
       enable: true,
       'force-dns-mapping': true,
       'parse-pure-ip': true,
@@ -227,34 +222,32 @@ function generateConfig(userName, ruProviderUrl, foreignProviderUrl, excludePack
         HTTP: { ports: [80, '8080-8880'], 'override-destination': true },
         TLS: { ports: [443, 8443] }
       }
-    },
+    };
+}
 
-    'proxy-providers': {
-      ru_servers: {
-        type: 'http',
-        interval: 3600,
-        url: ruProviderUrl,
-        path: './proxy-providers/ru_servers.yaml',
-        'health-check': {
-          enable: true,
-          interval: 600,
-          url: 'https://www.gstatic.com/generate_204'
-        }
-      },
-      foreign_servers: {
-        type: 'http',
-        interval: 3600,
-        url: foreignProviderUrl,
-        path: './proxy-providers/foreign_servers.yaml',
-        'health-check': {
-          enable: true,
-          interval: 600,
-          url: 'https://www.gstatic.com/generate_204'
-        }
-      }
-    },
+function httpProxyProvider(url, providerPath) {
+  return {
+    type: 'http',
+    interval: 3600,
+    url,
+    path: providerPath,
+    'health-check': {
+      enable: true,
+      interval: 600,
+      url: 'https://www.gstatic.com/generate_204'
+    }
+  };
+}
 
-    'proxy-groups': [
+function buildProxyProviders(ruProviderUrl, foreignProviderUrl) {
+  return {
+    ru_servers: httpProxyProvider(ruProviderUrl, './proxy-providers/ru_servers.yaml'),
+    foreign_servers: httpProxyProvider(foreignProviderUrl, './proxy-providers/foreign_servers.yaml')
+  };
+}
+
+function buildProxyGroups() {
+  return [
       {
         name: '♻️ Автовыбор (Иностранные)',
         type: 'fallback',
@@ -406,9 +399,11 @@ function generateConfig(userName, ruProviderUrl, foreignProviderUrl, excludePack
         proxies: ['🌍 Иностранные серверы', 'DIRECT', '🇷🇺 Российские серверы'],
         use: ['foreign_servers', 'ru_servers']
       }
-    ],
+  ];
+}
 
-    'rule-providers': {
+function buildRuleProviders() {
+  return {
       oisd_big: {
         type: 'http',
         behavior: 'domain',
@@ -616,9 +611,11 @@ function generateConfig(userName, ruProviderUrl, foreignProviderUrl, excludePack
           'AND,((IP-CIDR,66.22.192.0/18),(NETWORK,udp),(DST-PORT,50000-50100))'
         ]
       }
-    },
+  };
+}
 
-    rules: [
+function buildRules() {
+  return [
       'RULE-SET,oisd_big,🚫 Реклама',
       'RULE-SET,games-direct,🎮 Игры (DIRECT)',
       'RULE-SET,torrent-clients,DIRECT',
@@ -656,7 +653,26 @@ function generateConfig(userName, ruProviderUrl, foreignProviderUrl, excludePack
       'DOMAIN-SUFFIX,рф,DIRECT',
       'DOMAIN-SUFFIX,su,DIRECT',
       'MATCH,🌐 Остальной трафик (MATCH)'
-    ]
+  ];
+}
+
+// Generate the complete Mihomo config template for a user
+function generateConfig(userName, ruProviderUrl, foreignProviderUrl, excludePackages = []) {
+  return {
+    mode: 'rule',
+    ipv6: false,
+    'log-level': 'info',
+    'allow-lan': false,
+    'unified-delay': true,
+    'tcp-concurrent': true,
+
+    dns: buildDns(),
+    tun: buildTun(excludePackages),
+    sniffer: buildSniffer(),
+    'proxy-providers': buildProxyProviders(ruProviderUrl, foreignProviderUrl),
+    'proxy-groups': buildProxyGroups(),
+    'rule-providers': buildRuleProviders(),
+    rules: buildRules()
   };
 }
 
