@@ -1040,4 +1040,4 @@ function parseSubscriptionUrl(line) {
   };
 }
 
-module.exports = { parseVless, parseVmess, parseSS, parseTrojan, parseHysteria2, parseTuic, parseAmneziaWireGuardProxy, parseAmneziaAwgProxy, parseAmneziaVlessProxy, parseWireGuardConfig, parseProxyUrl, parseSubscriptionUrl };
+module.exports = { parseVless, parseVmess, parseSS, parseTrojan, parseHysteria2, parseTuic, parseAmneziaWireGuardProxy, parseAmneziaAwgProxy, parseAmneziaVlessProxy, parseWireGuardConfig, parseProxyUrl, parseSubscriptionUrl, parseAmneziaVpnJson };

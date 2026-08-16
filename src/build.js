@@ -47,24 +47,14 @@ async function parseProxy(content, baseName) {
   content = content.trim();
   if (!content) return null;
 
-  // Try JSON first (AmneziaWG/Xray containers)
+  // Try JSON first (AmneziaWG/Xray containers) — same parser as vpn:// links
   try {
     const json = JSON.parse(content);
     if (json.containers) {
-      for (const container of json.containers) {
-        if (container.awg) {
-          const p = parsers.parseAmneziaAwgProxy(json, container);
-          if (p) return p;
-        } else if (container.wireguard) {
-          const p = parsers.parseAmneziaWireGuardProxy(json, container);
-          if (p) return p;
-        } else if (container.xray) {
-          const p = parsers.parseAmneziaVlessProxy(json, container);
-          if (p) return p;
-        }
-      }
+      const p = parsers.parseAmneziaVpnJson(json);
+      if (p) return p;
     }
-  } catch (e) {
+  } catch {
     // Not JSON
   }
 
