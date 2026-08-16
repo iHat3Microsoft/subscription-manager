@@ -24,24 +24,40 @@ const BASE_URL = (process.env.BASE_URL || 'https://sub.k3k.lol').replace(/\/+$/,
 const RU_APP_LIST_URL = 'https://raw.githubusercontent.com/legiz-ru/mihomo-rule-sets/main/other/ru-app-list.yaml';
 const RU_APP_LIST_CACHE = path.join(DATA_DIR, '.ru-app-list.yaml');
 
-function loadRuPackages() {
-  let raw;
-  if (fs.existsSync(RU_APP_LIST_CACHE)) {
-    raw = fs.readFileSync(RU_APP_LIST_CACHE, 'utf8');
-  } else {
-    console.log('[info] downloading ru-app-list.yaml from legiz ...');
-    const { execSync } = require('child_process');
-    fs.mkdirSync(path.dirname(RU_APP_LIST_CACHE), { recursive: true });
-    execSync(`curl -fsSL "${RU_APP_LIST_URL}" -o "${RU_APP_LIST_CACHE}"`);
-    raw = fs.readFileSync(RU_APP_LIST_CACHE, 'utf8');
-  }
-  const parsed = yaml.load(raw);
+function parseRuAppList(raw) {
+  if (!raw || !raw.trim()) throw new Error('empty cache file');
+  const parsed = yaml.load(raw); // throws on corrupt cache
   const pkgs = [];
   for (const line of (parsed && parsed.payload) || []) {
     const m = /^PROCESS-NAME,(.+)$/.exec(line);
     if (m) pkgs.push(m[1]);
   }
   return [...new Set(pkgs)].sort();
+}
+
+function downloadRuAppList() {
+  console.log('[info] downloading ru-app-list.yaml from legiz ...');
+  const { execSync } = require('child_process');
+  fs.mkdirSync(path.dirname(RU_APP_LIST_CACHE), { recursive: true });
+  execSync(`curl -fsSL "${RU_APP_LIST_URL}" -o "${RU_APP_LIST_CACHE}"`);
+}
+
+function loadRuPackages() {
+  if (fs.existsSync(RU_APP_LIST_CACHE)) {
+    try {
+      const pkgs = parseRuAppList(fs.readFileSync(RU_APP_LIST_CACHE, 'utf8'));
+      if (pkgs.length > 0) return pkgs;
+      // half-written files often parse as a plain scalar with no payload
+      console.warn('[warn] ru-app-list cache has 0 packages, re-downloading');
+    } catch (e) {
+      console.warn(`[warn] ru-app-list cache corrupt (${e.message}), re-downloading`);
+    }
+    // A broken cache would silently disable tun.exclude-package on every
+    // future build — delete it and fetch a fresh copy instead.
+    fs.rmSync(RU_APP_LIST_CACHE, { force: true });
+  }
+  downloadRuAppList();
+  return parseRuAppList(fs.readFileSync(RU_APP_LIST_CACHE, 'utf8'));
 }
 
 // Helper to parse a single text chunk (file content)
