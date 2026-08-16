@@ -293,7 +293,7 @@ mk_safe() {
     local s="${1,,}"
     s="${s//[^a-z0-9_]/_}"
     while [[ "${#s}" -lt 3 ]]; do s="${s}_x"; done
-    while [[ "${#s}" -gt 30 ]]; do s="${s%_}"; done
+    while [[ "${#s}" -gt 30 ]]; do s="${s%?}"; done
     printf '%s' "$s"
 }
 declare -A ORIG_TO_SAFE=()
@@ -311,13 +311,14 @@ resolve_safe() {
     if [[ -n "${ORIG_TO_SAFE[$orig]:-}" ]]; then echo "${ORIG_TO_SAFE[$orig]}"; return; fi
     safe=$(mk_safe "$orig")
     if [[ -n "${SAFE_TO_ORIG[$safe]:-}" && "${SAFE_TO_ORIG[$safe]}" != "$orig" ]]; then
-        # collision: append 4-hex suffix from sha1 of orig
+        # collision: append 4-hex suffix from sha1 of orig,
+        # trim base so the result stays under Marzban's 32-char limit
         if command -v sha1sum >/dev/null 2>&1; then
             hash=$(printf '%s' "$orig" | sha1sum | cut -c1-4)
         else
             hash=$(printf '%s' "$orig" | md5sum 2>/dev/null | cut -c1-4)
         fi
-        safe="${safe}_${hash}"
+        safe="${safe:0:27}_${hash}"
     fi
     ORIG_TO_SAFE["$orig"]="$safe"
     SAFE_TO_ORIG["$safe"]="$orig"
