@@ -212,7 +212,6 @@ echo "[*] Remote filename: $REMOTE_FILENAME"
 echo
 
 # Validate + ensure folder name matches Marzban naming rules
-declare -a TO_CREATE=()
 declare -a TO_FETCH=()
 for u in "${USERS[@]}"; do
     if [[ ! "$u" =~ ^[A-Za-z0-9._-]+$ ]]; then
