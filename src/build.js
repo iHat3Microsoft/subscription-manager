@@ -660,6 +660,27 @@ function generateConfig(userName, ruProviderUrl, foreignProviderUrl, excludePack
   };
 }
 
+// Read every file in a user's ru/ or foreign/ dir and collect proxies:
+// share links are parsed line-by-line, multi-line formats (raw WG/AWG
+// .conf, Amnezia JSON) are parsed as a whole file.
+async function collectProxiesFromDir(dir) {
+  const proxies = [];
+  if (!fs.existsSync(dir)) return proxies;
+  for (const f of fs.readdirSync(dir).sort()) {
+    const content = fs.readFileSync(path.join(dir, f), 'utf-8');
+    const baseName = f.replace(/\.[^/.]+$/, '');
+
+    for (const line of content.split('\n')) {
+      asProxyList(await parseProxy(line, baseName), baseName).forEach(p => proxies.push(p));
+    }
+
+    if (content.includes('[Interface]') || content.trim().startsWith('{')) {
+      asProxyList(await parseProxy(content, baseName), baseName).forEach(p => proxies.push(p));
+    }
+  }
+  return proxies;
+}
+
 // Process all users in the data directory
 async function buildAll() {
   if (!fs.existsSync(DATA_DIR)) {
@@ -696,56 +717,8 @@ async function buildAll() {
       console.log(`[Info] Generated new secure token for user: ${user}`);
     }
 
-    let ruProxies = [];
-    let foreignProxies = [];
-
-    // Parse RU servers
-    if (fs.existsSync(ruDir)) {
-      const files = fs.readdirSync(ruDir).sort();
-      for (const f of files) {
-        const content = fs.readFileSync(path.join(ruDir, f), 'utf-8');
-        const lines = content.split('\n');
-        let validProxies = [];
-
-        const baseName = f.replace(/\.[^/.]+$/, "");
-
-        for (let i = 0; i < lines.length; i++) {
-          const result = await parseProxy(lines[i], baseName);
-          asProxyList(result, baseName).forEach(p => validProxies.push(p));
-        }
-
-        if (content.includes('[Interface]') || content.trim().startsWith('{')) {
-          const result = await parseProxy(content, baseName);
-          asProxyList(result, baseName).forEach(p => validProxies.push(p));
-        }
-
-        validProxies.forEach(p => ruProxies.push(p));
-      }
-    }
-
-    // Parse Foreign servers
-    if (fs.existsSync(foreignDir)) {
-      const files = fs.readdirSync(foreignDir).sort();
-      for (const f of files) {
-        const content = fs.readFileSync(path.join(foreignDir, f), 'utf-8');
-        const lines = content.split('\n');
-        const validProxies = [];
-
-        const baseName = f.replace(/\.[^/.]+$/, "");
-
-        for (let i = 0; i < lines.length; i++) {
-          const result = await parseProxy(lines[i], baseName);
-          asProxyList(result, baseName).forEach(p => validProxies.push(p));
-        }
-
-        if (content.includes('[Interface]') || content.trim().startsWith('{')) {
-          const result = await parseProxy(content, baseName);
-          asProxyList(result, baseName).forEach(p => validProxies.push(p));
-        }
-
-        validProxies.forEach(p => foreignProxies.push(p));
-      }
-    }
+    let ruProxies = await collectProxiesFromDir(ruDir);
+    let foreignProxies = await collectProxiesFromDir(foreignDir);
 
     const sortProxies = (a, b) => {
       const a10g = a.name.includes('10гбит') || a.name.includes('10G') || a.name.includes('10gbit');
