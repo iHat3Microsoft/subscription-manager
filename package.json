@@ -1,12 +1,20 @@
 {
   "name": "subscription-manager",
   "version": "1.0.0",
-  "description": "",
-  "main": "index.js",
+  "description": "Backend that builds Mihomo master configs and proxy-providers from per-user VPN keys (AmneziaWG/Wireguard/VLESS)",
+  "main": "src/build.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "build": "node src/build.js",
+    "test": "node --check src/build.js && node --check src/parsers.js"
   },
-  "keywords": [],
+  "keywords": [
+    "mihomo",
+    "clash-meta",
+    "vpn",
+    "amneziawg",
+    "wireguard",
+    "vless"
+  ],
   "author": "",
   "license": "ISC",
   "type": "commonjs",
