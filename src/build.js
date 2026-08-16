@@ -15,7 +15,9 @@ if (!fs.existsSync(PROVIDERS_DIR)) fs.mkdirSync(PROVIDERS_DIR, { recursive: true
 if (!fs.existsSync(CONFIGS_DIR)) fs.mkdirSync(CONFIGS_DIR, { recursive: true });
 
 // Environment or default base URL for providers
-const BASE_URL = process.env.BASE_URL || 'https://sub.k3k.lol';
+// (trailing slash is normalized away: BASE_URL=https://host/ must not
+// produce double slashes in provider/config URLs)
+const BASE_URL = (process.env.BASE_URL || 'https://sub.k3k.lol').replace(/\/+$/, '');
 
 // Кэш списка RU-пакетов (legiz) — чтобы не качать при каждом билде
 // Список маленький (~20 KB), кладём рядом с data/, но в .gitignore
