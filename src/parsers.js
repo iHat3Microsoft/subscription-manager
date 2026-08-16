@@ -1051,4 +1051,4 @@ function uniqueServerName(name) {
   return name + '-' + i;
 }
 
-module.exports = { parseVless, parseVmess, parseSS, parseTrojan, parseHysteria2, parseTuic, parseAmneziaWireGuardProxy, parseAmneziaAwgProxy, parseAmneziaVlessProxy, parseWireGuardConfig, parseProxyUrl };
+module.exports = { parseVless, parseVmess, parseSS, parseTrojan, parseHysteria2, parseTuic, parseAmneziaWireGuardProxy, parseAmneziaAwgProxy, parseAmneziaVlessProxy, parseWireGuardConfig, parseProxyUrl, parseSubscriptionUrl };
