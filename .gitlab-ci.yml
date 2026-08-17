@@ -1,28 +1,111 @@
-# CI: cheap correctness checks on every push.
-# No deploy jobs here — deploys happen on the server itself via
-# ops/subman-deploy.sh (forced command in authorized_keys).
+# =============================================================================
+# subscription-manager — GitLab CI
+#
+# СОСТОЯНИЕ: ВЫКЛЮЧЕНО. На push / merge request пайплайн вообще не создаётся:
+# workflow-гейт ниже пропускает только ручной запуск (Run pipeline).
+# Полностью закомментировать файл нельзя — пустой .gitlab-ci.yml GitLab
+# считает невалидным и на каждый пуш показывает красный "invalid config",
+# поэтому здесь живёт джоба-заглушка placeholder.
+#
+# КАК ВКЛЮЧИТЬ (3 шага):
+#   1) удали блок GATE: workflow-правила и джобу placeholder ниже;
+#   2) раскомментируй весь блок PIPELINE (убери ведущие "# ");
+#   3) для деплой-джобы пропиши CI/CD-переменные (Settings > CI/CD >
+#      Variables); тестовым джобам переменные не нужны:
+#        SSH_PRIVATE_KEY  тип File   — приватный ключ deploy-пользователя
+#        SSH_KNOWN_HOSTS  тип File   — вывод: ssh-keyscan -p <port> <host>
+#        DEPLOY_HOST               — например sub.k3k.lol
+#        DEPLOY_USER               — deploy-bot
+#        DEPLOY_PORT  (опционально) — 22
+#        BASE_URL    (опционально)  — https://sub.k3k.lol (для environment)
+#      Сервер: deploy-bot + forced command /usr/local/bin/subman-deploy.sh
+#      (README, ops/setup-deploy-bot.sh). Переменные с ключами пометь
+#      Protected и сделай ветку master Protected.
+#
+# Что делает включённый пайплайн:
+#   test    — синтаксис node + регрессия парсеров, bash -n + тесты хелперов,
+#             валидация my-rules.yaml (его получают клиенты);
+#   deploy  — ТОЛЬКО ручной (when: manual) запуск из ветки по умолчанию,
+#             ssh forced command subman-deploy.sh, resource_group против
+#             параллельных деплоев, known_hosts из переменной (без
+#             StrictHostKeyChecking=no).
+# =============================================================================
 
-stages:
-  - test
+# --- GATE: удалить при включении ---------------------------------------------
+workflow:
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "web"'
+    - when: never
 
-node-syntax:
-  stage: test
-  image: node:20-alpine
+placeholder:
   script:
-    - node --check src/build.js
-    - node --check src/parsers.js
-    - node tests/test_parsers.js
+    - echo "CI отключён: пайплайн запущен вручную через Run pipeline."
+    - echo "Как включить настоящий пайплайн — см. комментарий вверху .gitlab-ci.yml"
+# -----------------------------------------------------------------------------
 
-bash-syntax:
-  stage: test
-  image: bash:5
-  script:
-    - for f in *.sh sync.bash ops/*.sh tests/*.sh; do echo "bash -n $f"; bash -n "$f"; done
-    - bash tests/test_shell_helpers.sh
+# --- PIPELINE: раскомментировать при включении -------------------------------
+# workflow:
+#   rules:
+#     - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+#     - if: '$CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH'
 
-yaml-validate:
-  stage: test
-  image: node:20-alpine
-  script:
-    - npm ci --omit=dev
-    - node -e "const fs=require('fs'),yaml=require('js-yaml');yaml.load(fs.readFileSync('my-rules.yaml','utf8'));console.log('my-rules.yaml: valid YAML')"
+# stages:
+#   - test
+#   - deploy
+
+# node-syntax:
+#   stage: test
+#   image: node:20-alpine
+#   interruptible: true
+#   script:
+#     - node --check src/build.js
+#     - node --check src/parsers.js
+#     - node tests/test_parsers.js
+
+# bash-syntax:
+#   stage: test
+#   image: bash:5
+#   interruptible: true
+#   script:
+#     - for f in *.sh sync.bash ops/*.sh tests/*.sh; do echo "bash -n $f"; bash -n "$f"; done
+#     - bash tests/test_shell_helpers.sh
+
+# yaml-validate:
+#   stage: test
+#   image: node:20-alpine
+#   interruptible: true
+#   script:
+#     - npm ci --omit=dev
+#     - node -e "const fs=require('fs'),yaml=require('js-yaml');yaml.load(fs.readFileSync('my-rules.yaml','utf8'));console.log('my-rules.yaml: OK')"
+
+# deploy:production:
+#   stage: deploy
+#   image: alpine:3.20
+#   needs: [node-syntax, bash-syntax, yaml-validate]
+#   interruptible: false
+#   resource_group: production
+#   variables:
+#     GIT_STRATEGY: none
+#   before_script:
+#     - apk add --no-cache openssh-client
+#     - eval $(ssh-agent -s)
+#     - |
+#       if [ -f "$SSH_PRIVATE_KEY" ]; then ssh-add "$SSH_PRIVATE_KEY"
+#       else tr -d '\r' < "$SSH_PRIVATE_KEY" | ssh-add -
+#       fi
+#     - mkdir -p ~/.ssh && chmod 700 ~/.ssh
+#     - |
+#       if [ -f "$SSH_KNOWN_HOSTS" ]; then cp "$SSH_KNOWN_HOSTS" ~/.ssh/known_hosts
+#       else printf '%s\n' "$SSH_KNOWN_HOSTS" > ~/.ssh/known_hosts
+#       fi
+#     - chmod 644 ~/.ssh/known_hosts
+#   script:
+#     - ssh -p "${DEPLOY_PORT:-22}" "${DEPLOY_USER}@${DEPLOY_HOST}" /usr/local/bin/subman-deploy.sh
+#   environment:
+#     name: production
+#     url: "$BASE_URL"
+#   rules:
+#     - if: '$CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH'
+#       when: manual
+#     - when: never
+# -----------------------------------------------------------------------------
