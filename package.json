@@ -5,7 +5,7 @@
   "main": "src/build.js",
   "scripts": {
     "build": "node src/build.js",
-    "test": "node --check src/build.js && node --check src/parsers.js"
+    "test": "node --check src/build.js && node --check src/parsers.js && node tests/test_parsers.js && bash tests/test_shell_helpers.sh"
   },
   "keywords": [
     "mihomo",

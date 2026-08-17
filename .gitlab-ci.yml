@@ -11,12 +11,14 @@ node-syntax:
   script:
     - node --check src/build.js
     - node --check src/parsers.js
+    - node tests/test_parsers.js
 
 bash-syntax:
   stage: test
   image: bash:5
   script:
-    - for f in *.sh sync.bash ops/*.sh; do echo "bash -n $f"; bash -n "$f"; done
+    - for f in *.sh sync.bash ops/*.sh tests/*.sh; do echo "bash -n $f"; bash -n "$f"; done
+    - bash tests/test_shell_helpers.sh
 
 yaml-validate:
   stage: test
