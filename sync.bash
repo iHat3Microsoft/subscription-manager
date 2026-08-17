@@ -10,9 +10,11 @@ SSH_CONFIG="${SSH_CONFIG:-/home/chm0d777/.config/ssh-mcp/ssh_config}"
 REMOTE="${REMOTE:-nether2}"
 REMOTE_DIR="${REMOTE_DIR:-/opt/subscription-manager}"
 
+# Sync the whole src/ set: build.js requires parsers.js, so shipping
+# only build.js would put a new build on top of an old parser.
 rsync -avz --progress \
   -e "ssh -F ${SSH_CONFIG}" \
-  "src/build.js" \
-  "${REMOTE}:${REMOTE_DIR}/src/build.js"
+  src/build.js src/parsers.js \
+  "${REMOTE}:${REMOTE_DIR}/src/"
 
-echo "Synced src/build.js to ${REMOTE}:${REMOTE_DIR}/src/build.js"
+echo "Synced src/build.js, src/parsers.js to ${REMOTE}:${REMOTE_DIR}/src/"
