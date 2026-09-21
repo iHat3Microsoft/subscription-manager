@@ -12,7 +12,7 @@ REMOTE_DIR="${REMOTE_DIR:-/opt/subscription-manager}"
 
 rsync -avz --progress \
   -e "ssh -F ${SSH_CONFIG}" \
-  "src/build.js" \
-  "${REMOTE}:${REMOTE_DIR}/src/build.js"
+  "src/build.js" "src/parsers.js" \
+  "${REMOTE}:${REMOTE_DIR}/src/"
 
-echo "Synced src/build.js to ${REMOTE}:${REMOTE_DIR}/src/build.js"
+echo "Synced src/build.js and src/parsers.js to ${REMOTE}:${REMOTE_DIR}/src/"
