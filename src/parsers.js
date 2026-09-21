@@ -692,8 +692,23 @@ function normalizeAwgValue(v) {
   return v;
 }
 
+/**
+ * Build a case-insensitive key lookup over a WireGuard/AmneziaWG section.
+ * The index is built once per section instead of rescanning the keys on every
+ * lookup, and exact matches still win over case-folded ones — this handles
+ * variants like PresharedKey / PreSharedKey / PRESHAREDKEY.
+ */
+function awgLookup(obj) {
+  const byLower = new Map();
+  for (const [key, value] of Object.entries(obj || {})) {
+    const lower = key.toLowerCase();
+    if (!byLower.has(lower)) byLower.set(lower, value);
+  }
+  return key => (obj && key in obj) ? obj[key] : byLower.get(key.toLowerCase());
+}
+
 function getAwgKey(obj, k) {
-  return obj?.[k] ?? obj?.[k.toUpperCase()] ?? obj?.[k.toLowerCase()];
+  return awgLookup(obj)(k);
 }
 
 function hasAwgKey(obj, k) {
@@ -715,57 +730,114 @@ function toIntOrRangeMaybe(v) {
   return `${m[1]}-${m[2]}`;
 }
 
-function hasAnyAwgKey(obj) {
-  const keys = [
-    'Jc','Jmin','Jmax',
-    'S1','S2','S3','S4',
-    'H1','H2','H3','H4',
-    'I1','I2','I3','I4','I5',
-    'J1','J2','J3',
-    'Itime'
-  ];
-  for (const k of keys) {
-    if (hasAwgKey(obj, k)) return true;
-  }
-  return false;
+/**
+ * Resolve the AmneziaWG generation. An explicit version from the source wins;
+ * otherwise it is inferred from which knobs are present. A source that declares
+ * plain "3" still reports 3.1 when it carries a 3.1-only knob, because the two
+ * releases share one wire protocol and differ only by these extra options.
+ */
+function normalizeAwgVersion(rawVersion, flags) {
+  const v = String(rawVersion ?? '').trim().toLowerCase();
+  if (v === '3.1') return '3.1';
+  if (v === '3' || v === '3.0') return flags.hasV31 ? '3.1' : '3.0';
+  if (v === '2' || v === '2.0') return '2.0';
+  if (v === '1.5') return '1.5';
+  if (v === '1' || v === '1.0') return '1.0';
+  if (flags.hasV31) return '3.1';
+  if (flags.hasV3) return '3.0';
+  return flags.hasV20 ? '2.0' : (flags.hasV15 ? '1.5' : '1.0');
 }
 
-function collectAwgOptions(obj) {
-  const h1 = toIntOrRangeMaybe(getAwgKey(obj, 'H1'));
-  const h2 = toIntOrRangeMaybe(getAwgKey(obj, 'H2'));
-  const h3 = toIntOrRangeMaybe(getAwgKey(obj, 'H3'));
-  const h4 = toIntOrRangeMaybe(getAwgKey(obj, 'H4'));
-  const hasV20 =
-    hasAwgKey(obj, 'S3') || hasAwgKey(obj, 'S4') ||
-    [h1, h2, h3, h4].some(v => typeof v === 'string');
-  const hasV15 = hasAwgKey(obj, 'I1');
+const asAwgInt = v => toIntMaybe(v) ?? 0;
+const asAwgIntOrRange = v => toIntOrRangeMaybe(v) ?? 0;
+const asAwgBool = v => /^(1|true|yes|on)$/i.test(normalizeAwgValue(v));
 
-  const awg = {};
-  if (hasAwgKey(obj, 'Jc')) awg.jc = toIntMaybe(getAwgKey(obj, 'Jc')) ?? 0;
-  if (hasAwgKey(obj, 'Jmin')) awg.jmin = toIntMaybe(getAwgKey(obj, 'Jmin')) ?? 0;
-  if (hasAwgKey(obj, 'Jmax')) awg.jmax = toIntMaybe(getAwgKey(obj, 'Jmax')) ?? 0;
-  if (hasAwgKey(obj, 'S1')) awg.s1 = toIntMaybe(getAwgKey(obj, 'S1')) ?? 0;
-  if (hasAwgKey(obj, 'S2')) awg.s2 = toIntMaybe(getAwgKey(obj, 'S2')) ?? 0;
-  if (hasAwgKey(obj, 'S3')) awg.s3 = toIntMaybe(getAwgKey(obj, 'S3')) ?? 0;
-  if (hasAwgKey(obj, 'S4')) awg.s4 = toIntMaybe(getAwgKey(obj, 'S4')) ?? 0;
-  if (hasAwgKey(obj, 'H1')) awg.h1 = h1 ?? 0;
-  if (hasAwgKey(obj, 'H2')) awg.h2 = h2 ?? 0;
-  if (hasAwgKey(obj, 'H3')) awg.h3 = h3 ?? 0;
-  if (hasAwgKey(obj, 'H4')) awg.h4 = h4 ?? 0;
+/**
+ * AmneziaWG obfuscation knobs, in the order mihomo expects them.
+ * `v15` marks fields that only exist from protocol 1.5 onward. This list is the
+ * single definition of which keys count as AmneziaWG — see hasAnyAwgKey().
+ *
+ * `legacyOnly` and `v3` mark the knobs each protocol generation owns
+ * exclusively: v3 dropped the controlled-junk/itime handshake knobs and added
+ * header protection plus the handshake timers. `v31` marks the two options
+ * AmneziaWG 3.1 added on top of 3.0.
+ */
+const AWG_FIELD_SPECS = [
+  { key: 'Jc',    out: 'jc',    parse: asAwgInt },
+  { key: 'Jmin',  out: 'jmin',  parse: asAwgInt },
+  { key: 'Jmax',  out: 'jmax',  parse: asAwgInt },
+  { key: 'S1',    out: 's1',    parse: asAwgInt },
+  { key: 'S2',    out: 's2',    parse: asAwgInt },
+  { key: 'S3',    out: 's3',    parse: asAwgInt },
+  { key: 'S4',    out: 's4',    parse: asAwgInt },
+  { key: 'H1',    out: 'h1',    parse: asAwgIntOrRange },
+  { key: 'H2',    out: 'h2',    parse: asAwgIntOrRange },
+  { key: 'H3',    out: 'h3',    parse: asAwgIntOrRange },
+  { key: 'H4',    out: 'h4',    parse: asAwgIntOrRange },
+  { key: 'I1',    out: 'i1',    parse: normalizeAwgValue, v15: true },
+  { key: 'I2',    out: 'i2',    parse: normalizeAwgValue, v15: true },
+  { key: 'I3',    out: 'i3',    parse: normalizeAwgValue, v15: true },
+  { key: 'I4',    out: 'i4',    parse: normalizeAwgValue, v15: true },
+  { key: 'I5',    out: 'i5',    parse: normalizeAwgValue, v15: true },
+  { key: 'J1',    out: 'j1',    parse: normalizeAwgValue, v15: true, legacyOnly: true },
+  { key: 'J2',    out: 'j2',    parse: normalizeAwgValue, v15: true, legacyOnly: true },
+  { key: 'J3',    out: 'j3',    parse: normalizeAwgValue, v15: true, legacyOnly: true },
+  { key: 'Itime', out: 'itime', parse: asAwgInt,          v15: true, legacyOnly: true },
 
-  if (hasV15) {
-    awg.i1 = normalizeAwgValue(getAwgKey(obj, 'I1'));
-    if (hasAwgKey(obj, 'I2')) awg.i2 = normalizeAwgValue(getAwgKey(obj, 'I2'));
-    if (hasAwgKey(obj, 'I3')) awg.i3 = normalizeAwgValue(getAwgKey(obj, 'I3'));
-    if (hasAwgKey(obj, 'I4')) awg.i4 = normalizeAwgValue(getAwgKey(obj, 'I4'));
-    if (hasAwgKey(obj, 'I5')) awg.i5 = normalizeAwgValue(getAwgKey(obj, 'I5'));
-    if (hasAwgKey(obj, 'J1')) awg.j1 = normalizeAwgValue(getAwgKey(obj, 'J1'));
-    if (hasAwgKey(obj, 'J2')) awg.j2 = normalizeAwgValue(getAwgKey(obj, 'J2'));
-    if (hasAwgKey(obj, 'J3')) awg.j3 = normalizeAwgValue(getAwgKey(obj, 'J3'));
-    if (hasAwgKey(obj, 'Itime')) awg.itime = toIntMaybe(getAwgKey(obj, 'Itime')) ?? 0;
+  { key: 'HeaderProtectionKey',    out: 'header-protection-key',    parse: normalizeAwgValue, v3: true },
+  { key: 'ContentPaddingAddition', out: 'content-padding-addition', parse: asAwgIntOrRange,   v3: true },
+  { key: 'RekeyAfterTime',         out: 'rekey-after-time',         parse: asAwgIntOrRange,   v3: true },
+  { key: 'RekeyTimeout',           out: 'rekey-timeout',            parse: asAwgIntOrRange,   v3: true },
+  { key: 'RejectAfterTime',        out: 'reject-after-time',        parse: asAwgIntOrRange,   v3: true },
+  { key: 'KeepaliveTimeout',       out: 'keepalive-timeout',        parse: asAwgIntOrRange,   v3: true },
+  { key: 'MaxHandshakeAttempts',   out: 'max-handshake-attempts',   parse: asAwgIntOrRange,   v3: true },
+  { key: 'RandomTrailers',         out: 'random-trailers',          parse: asAwgBool, v3: true, v31: true },
+  { key: 'DisableCookies',         out: 'disable-cookies',          parse: asAwgBool, v3: true, v31: true }
+];
+
+function hasAnyAwgKey(getOrObj) {
+  const get = typeof getOrObj === 'function' ? getOrObj : awgLookup(getOrObj);
+  return AWG_FIELD_SPECS.some(spec => get(spec.key) !== undefined);
+}
+
+/**
+ * Keep only the knobs the resolved generation accepts, and pin `version` for
+ * v3. mihomo hands `version: 3` to the AmneziaWG v3 device and every other
+ * value to the legacy one; each rejects the other's exclusive keys outright, so
+ * an unfiltered knob — or a missing `version` — is a startup failure rather
+ * than a harmless no-op.
+ */
+function buildAwgOption(parsed, version) {
+  const v3 = version.startsWith('3');
+  const awg = v3 ? { version: 3 } : {};
+  for (const spec of AWG_FIELD_SPECS) {
+    if (!(spec.out in parsed)) continue;
+    if (v3 ? spec.legacyOnly : spec.v3) continue;
+    awg[spec.out] = parsed[spec.out];
+  }
+  return awg;
+}
+
+function collectAwgOptions(getOrObj, rawVersion = '') {
+  const get = typeof getOrObj === 'function' ? getOrObj : awgLookup(getOrObj);
+  const hasV15 = get('I1') !== undefined;
+
+  const parsed = {};
+  for (const spec of AWG_FIELD_SPECS) {
+    if (spec.v15 && !hasV15) continue;
+    const raw = get(spec.key);
+    if (raw !== undefined) parsed[spec.out] = spec.parse(raw);
   }
 
-  return { awg, hasV20, hasV15 };
+  // Protocol 2.0 is implied by the S3/S4 knobs or by a header given as a range.
+  const hasV20 =
+    's3' in parsed || 's4' in parsed ||
+    ['h1', 'h2', 'h3', 'h4'].some(k => typeof parsed[k] === 'string');
+  const hasV3 = AWG_FIELD_SPECS.some(spec => spec.v3 && spec.out in parsed);
+  const hasV31 = AWG_FIELD_SPECS.some(spec => spec.v31 && spec.out in parsed);
+
+  const version = normalizeAwgVersion(rawVersion, { hasV31, hasV3, hasV20, hasV15 });
+  return { awg: buildAwgOption(parsed, version), version };
 }
 
 function setWireGuardDns(proxy, dns) {
@@ -839,7 +911,8 @@ function parseAmneziaAwgProxy(serverConfig, container) {
   const proxy = parseAmneziaWireGuardBaseProxy(serverConfig, protocolConfig, clientConfig, 'awg');
   if (!proxy) return null;
 
-  const { awg } = collectAwgOptions(clientConfig);
+  const { awg, version } = collectAwgOptions(awgLookup(clientConfig), protocolConfig.protocol_version);
+  proxy.awgVersion = version;
   proxy['amnezia-wg-option'] = awg;
 
   return proxy;
@@ -964,14 +1037,17 @@ function parseWireGuardConfig(text) {
     if (!kv) continue;
     (section === 'i' ? iface : peer)[kv[1].trim()] = kv[2].trim();
   }
-  const privateKey = getAwgKey(iface, 'PrivateKey');
-  const publicKey = getAwgKey(peer, 'PublicKey');
-  const endpoint = getAwgKey(peer, 'Endpoint');
+  const ifaceGet = awgLookup(iface);
+  const peerGet = awgLookup(peer);
+
+  const privateKey = ifaceGet('PrivateKey');
+  const publicKey = peerGet('PublicKey');
+  const endpoint = peerGet('Endpoint');
   if (!privateKey || !publicKey || !endpoint) return null;
   const ep = endpoint.match(/^([^:]+):(\d+)$/);
   if (!ep) return null;
   const server = ep[1], port = +ep[2];
-  const address = getAwgKey(iface, 'Address');
+  const address = ifaceGet('Address');
   let ip = '10.0.0.2';
   let ipv6 = null;
   if (address) {
@@ -981,7 +1057,7 @@ function parseWireGuardConfig(text) {
     if (v4) ip = v4;
     if (v6) ipv6 = v6;
   }
-  const isAmnezia = hasAnyAwgKey(iface);
+  const isAmnezia = hasAnyAwgKey(ifaceGet);
 
   const proxy = {
     name: (isAmnezia ? 'awg-' : 'wg-') + server,
@@ -991,16 +1067,17 @@ function parseWireGuardConfig(text) {
     udp: true
   };
   if (ipv6) proxy.ipv6 = ipv6;
-  const mtu = toIntMaybe(getAwgKey(iface, 'MTU'));
+  const mtu = toIntMaybe(ifaceGet('MTU'));
   if (mtu !== null) proxy.mtu = mtu;
-  const psk = getAwgKey(peer, 'PresharedKey');
+  const psk = peerGet('PresharedKey');
   if (psk) proxy['pre-shared-key'] = psk;
-  const pka = toIntMaybe(getAwgKey(peer, 'PersistentKeepalive'));
+  const pka = toIntMaybe(peerGet('PersistentKeepalive'));
   if (pka !== null && pka > 0) proxy['persistent-keepalive'] = pka;
-  const dns = getAwgKey(iface, 'DNS');
+  const dns = ifaceGet('DNS');
   if (dns) setWireGuardDns(proxy, dns.split(',')[0].trim());
   if (isAmnezia) {
-    const { awg } = collectAwgOptions(iface);
+    const { awg, version } = collectAwgOptions(ifaceGet, '');
+    proxy.awgVersion = version;
     proxy['amnezia-wg-option'] = awg;
   }
   return proxy;
