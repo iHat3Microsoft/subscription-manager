@@ -237,7 +237,8 @@ function generateConfig(userName, ruProviderUrl, foreignProviderUrl, excludePack
         path: './proxy-providers/ru_servers.yaml',
         'health-check': {
           enable: true,
-          interval: 600,
+          lazy: true,
+          interval: 900,
           url: 'https://www.gstatic.com/generate_204'
         }
       },
@@ -248,7 +249,8 @@ function generateConfig(userName, ruProviderUrl, foreignProviderUrl, excludePack
         path: './proxy-providers/foreign_servers.yaml',
         'health-check': {
           enable: true,
-          interval: 600,
+          lazy: true,
+          interval: 900,
           url: 'https://www.gstatic.com/generate_204'
         }
       }
@@ -259,30 +261,33 @@ function generateConfig(userName, ruProviderUrl, foreignProviderUrl, excludePack
         name: '♻️ Автовыбор (Иностранные)',
         type: 'fallback',
         hidden: true,
+        lazy: true,
         url: 'https://www.gstatic.com/generate_204',
-        interval: 60,
+        interval: 300,
         timeout: 5000,
-        'max-failed-times': 3,
+        'max-failed-times': 5,
         use: ['foreign_servers']
       },
       {
         name: '♻️ Автовыбор (Россия)',
         type: 'fallback',
         hidden: true,
+        lazy: true,
         url: 'https://www.gstatic.com/generate_204',
-        interval: 60,
+        interval: 300,
         timeout: 5000,
-        'max-failed-times': 3,
+        'max-failed-times': 5,
         use: ['ru_servers']
       },
       {
         name: '♻️ Резерв (RU -> EU)',
         type: 'fallback',
         hidden: true,
+        lazy: true,
         url: 'https://www.gstatic.com/generate_204',
-        interval: 60,
+        interval: 300,
         timeout: 5000,
-        'max-failed-times': 3,
+        'max-failed-times': 5,
         use: ['ru_servers', 'foreign_servers']
       },
       {
@@ -295,98 +300,109 @@ function generateConfig(userName, ruProviderUrl, foreignProviderUrl, excludePack
       {
         name: '🚫 Заблокированные сайты (RU)',
         type: 'select',
+        hidden: true,
         icon: 'https://raw.githubusercontent.com/remnawave/templates/refs/heads/main/icons/Blocked.png',
-        proxies: ['🌍 Иностранные серверы', '🇷🇺 Российские серверы', 'DIRECT'],
-        use: ['foreign_servers', 'ru_servers']
+        proxies: ['🌍 Иностранные серверы', 'DIRECT'],
+        use: ['foreign_servers']
       },
       {
         name: '🔞 18+',
         type: 'select',
         hidden: true,
         icon: 'https://cdn.jsdelivr.net/gh/Koolson/Qure@master/IconSet/Color/Pornhub.png',
-        proxies: ['🌍 Иностранные серверы', '🇷🇺 Российские серверы', 'DIRECT'],
-        use: ['foreign_servers', 'ru_servers']
+        proxies: ['🌍 Иностранные серверы', 'DIRECT'],
+        use: ['foreign_servers']
       },
       {
         name: '🚫 Реклама',
         type: 'select',
         icon: 'https://raw.githubusercontent.com/remnawave/templates/refs/heads/main/icons/AdBlock.png',
-        proxies: ['REJECT', 'DIRECT', '🌍 Иностранные серверы', '🇷🇺 Российские серверы'],
-        use: ['foreign_servers', 'ru_servers']
+        proxies: ['REJECT', 'DIRECT', '🌍 Иностранные серверы'],
+        use: ['foreign_servers']
       },
       {
         name: '🌐 Остальной трафик (MATCH)',
         type: 'select',
         icon: 'https://cdn.jsdelivr.net/gh/Koolson/Qure@master/IconSet/Color/Auto.png',
-        proxies: ['DIRECT', '🌍 Иностранные серверы', '🇷🇺 Российские серверы'],
-        use: ['foreign_servers', 'ru_servers']
+        proxies: ['DIRECT', '🌍 Иностранные серверы'],
+        use: ['foreign_servers']
       },
       {
         name: '💬 Discord',
         type: 'select',
+        hidden: true,
         icon: 'https://raw.githubusercontent.com/remnawave/templates/refs/heads/main/icons/Discord.png',
-        proxies: ['♻️ Резерв (RU -> EU)', '🇷🇺 Российские серверы', '🌍 Иностранные серверы', 'DIRECT'],
+        proxies: ['♻️ Резерв (RU -> EU)', '🌍 Иностранные серверы', 'DIRECT'],
         use: ['ru_servers', 'foreign_servers']
       },
       {
         name: '📞 WhatsApp',
         type: 'select',
+        hidden: true,
         icon: 'https://cdn.jsdelivr.net/gh/Koolson/Qure@master/IconSet/Color/WhatsApp.png',
-        proxies: ['🌍 Иностранные серверы', '🇷🇺 Российские серверы', 'DIRECT'],
-        use: ['foreign_servers', 'ru_servers']
+        proxies: ['🌍 Иностранные серверы', 'DIRECT'],
+        use: ['foreign_servers']
       },
       {
         name: '▶️ YouTube',
         type: 'select',
+        hidden: true,
         icon: 'https://cdn.jsdelivr.net/gh/Koolson/Qure@master/IconSet/Color/YouTube.png',
-        proxies: ['♻️ Резерв (RU -> EU)', '🇷🇺 Российские серверы', '🌍 Иностранные серверы', 'DIRECT'],
+        proxies: ['♻️ Резерв (RU -> EU)', '🌍 Иностранные серверы', 'DIRECT'],
         use: ['ru_servers', 'foreign_servers']
       },
       {
         name: '📸 Instagram & Threads',
         type: 'select',
+        hidden: true,
         icon: 'https://cdn.jsdelivr.net/gh/Koolson/Qure@master/IconSet/Color/Instagram.png',
-        proxies: ['🌍 Иностранные серверы', '🇷🇺 Российские серверы'],
-        use: ['foreign_servers', 'ru_servers']
+        proxies: ['🌍 Иностранные серверы'],
+        use: ['foreign_servers']
       },
       {
         name: '➤ Telegram',
         type: 'select',
+        hidden: true,
         icon: 'https://cdn.jsdelivr.net/gh/Koolson/Qure@master/IconSet/Color/Telegram.png',
-        proxies: ['🌍 Иностранные серверы', '🇷🇺 Российские серверы', 'DIRECT'],
-        use: ['foreign_servers', 'ru_servers']
+        proxies: ['🌍 Иностранные серверы', 'DIRECT'],
+        use: ['foreign_servers']
       },
       {
         name: '🎵 TikTok',
         type: 'select',
+        hidden: true,
         icon: 'https://cdn.jsdelivr.net/gh/Koolson/Qure@master/IconSet/Color/TikTok.png',
-        proxies: ['🌍 Иностранные серверы', '🇷🇺 Российские серверы'],
-        use: ['foreign_servers', 'ru_servers']
+        proxies: ['🌍 Иностранные серверы'],
+        use: ['foreign_servers']
       },
       {
         name: '🤖 AI (Нейронки)',
         type: 'select',
+        hidden: true,
         icon: 'https://cdn.jsdelivr.net/gh/Koolson/Qure@master/IconSet/Color/Spark.png',
-        proxies: ['🌍 Иностранные серверы', '🇷🇺 Российские серверы'],
-        use: ['foreign_servers', 'ru_servers']
+        proxies: ['🌍 Иностранные серверы'],
+        use: ['foreign_servers']
       },
       {
         name: '👾 Brawl Stars',
         type: 'select',
+        hidden: true,
         icon: 'https://cdn.jsdelivr.net/gh/Koolson/Qure@master/IconSet/Color/Game.png',
-        proxies: ['🌍 Иностранные серверы', '🇷🇺 Российские серверы'],
-        use: ['foreign_servers', 'ru_servers']
+        proxies: ['🌍 Иностранные серверы'],
+        use: ['foreign_servers']
       },
       {
         name: '👥 Facebook',
         type: 'select',
+        hidden: true,
         icon: 'https://cdn.jsdelivr.net/gh/Koolson/Qure@master/IconSet/Color/Facebook.png',
-        proxies: ['🌍 Иностранные серверы', '🇷🇺 Российские серверы'],
-        use: ['foreign_servers', 'ru_servers']
+        proxies: ['🌍 Иностранные серверы'],
+        use: ['foreign_servers']
       },
       {
         name: '🇷🇺 Российские серверы',
         type: 'select',
+        hidden: true,
         icon: 'https://cdn.jsdelivr.net/gh/Koolson/Qure@master/IconSet/Color/Russia.png',
         proxies: ['♻️ Автовыбор (Россия)'],
         use: ['ru_servers']
@@ -396,15 +412,15 @@ function generateConfig(userName, ruProviderUrl, foreignProviderUrl, excludePack
         type: 'select',
         hidden: true,
         icon: 'https://cdn.jsdelivr.net/gh/Koolson/Qure@master/IconSet/Color/Game.png',
-        proxies: ['DIRECT', '🌍 Иностранные серверы', '🇷🇺 Российские серверы'],
-        use: ['foreign_servers', 'ru_servers']
+        proxies: ['DIRECT', '🌍 Иностранные серверы'],
+        use: ['foreign_servers']
       },
       {
         name: '📋 My Rules',
         type: 'select',
         hidden: true,
-        proxies: ['🌍 Иностранные серверы', 'DIRECT', '🇷🇺 Российские серверы'],
-        use: ['foreign_servers', 'ru_servers']
+        proxies: ['🌍 Иностранные серверы', 'DIRECT'],
+        use: ['foreign_servers']
       }
     ],
 
