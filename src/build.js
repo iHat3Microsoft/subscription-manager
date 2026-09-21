@@ -21,18 +21,50 @@ const BASE_URL = process.env.BASE_URL || 'https://sub.k3k.lol';
 // Список маленький (~20 KB), кладём рядом с data/, но в .gitignore
 const RU_APP_LIST_URL = 'https://raw.githubusercontent.com/legiz-ru/mihomo-rule-sets/main/other/ru-app-list.yaml';
 const RU_APP_LIST_CACHE = path.join(DATA_DIR, '.ru-app-list.yaml');
+const RU_APP_LIST_TTL_MS = 7 * 24 * 60 * 60 * 1000; // 7 days TTL
+
+function downloadRuAppList() {
+  const { execSync } = require('child_process');
+  fs.mkdirSync(path.dirname(RU_APP_LIST_CACHE), { recursive: true });
+  execSync(`curl -fsSL "${RU_APP_LIST_URL}" -o "${RU_APP_LIST_CACHE}.tmp"`);
+  fs.renameSync(`${RU_APP_LIST_CACHE}.tmp`, RU_APP_LIST_CACHE);
+}
 
 function loadRuPackages() {
   let raw;
-  if (fs.existsSync(RU_APP_LIST_CACHE)) {
-    raw = fs.readFileSync(RU_APP_LIST_CACHE, 'utf8');
+  const exists = fs.existsSync(RU_APP_LIST_CACHE);
+  let isExpired = false;
+
+  if (exists) {
+    try {
+      const stat = fs.statSync(RU_APP_LIST_CACHE);
+      if (Date.now() - stat.mtimeMs > RU_APP_LIST_TTL_MS) {
+        isExpired = true;
+      }
+    } catch {
+      isExpired = true;
+    }
+  }
+
+  if (!exists || isExpired) {
+    try {
+      console.log(isExpired
+        ? '[info] ru-app-list cache expired (> 7 days), re-downloading from legiz ...'
+        : '[info] downloading ru-app-list.yaml from legiz ...');
+      downloadRuAppList();
+      raw = fs.readFileSync(RU_APP_LIST_CACHE, 'utf8');
+    } catch (e) {
+      if (exists) {
+        console.warn(`[warn] failed to refresh ru-app-list (${e.message}), using stale cache`);
+        raw = fs.readFileSync(RU_APP_LIST_CACHE, 'utf8');
+      } else {
+        throw e;
+      }
+    }
   } else {
-    console.log('[info] downloading ru-app-list.yaml from legiz ...');
-    const { execSync } = require('child_process');
-    fs.mkdirSync(path.dirname(RU_APP_LIST_CACHE), { recursive: true });
-    execSync(`curl -fsSL "${RU_APP_LIST_URL}" -o "${RU_APP_LIST_CACHE}"`);
     raw = fs.readFileSync(RU_APP_LIST_CACHE, 'utf8');
   }
+
   const parsed = yaml.load(raw);
   const pkgs = [];
   for (const line of (parsed && parsed.payload) || []) {
