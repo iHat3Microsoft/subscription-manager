@@ -626,6 +626,22 @@ function generateConfig(userName, ruProviderUrl, foreignProviderUrl, excludePack
         path: './rule-sets/ru-blocked.yaml',
         interval: 86400
       },
+      'ru-bundle': {
+        type: 'http',
+        behavior: 'domain',
+        format: 'mrs',
+        url: 'https://github.com/legiz-ru/mihomo-rule-sets/raw/main/ru-bundle/rule.mrs',
+        path: './rule-sets/ru-bundle.mrs',
+        interval: 86400
+      },
+      'rknasnblock': {
+        type: 'http',
+        behavior: 'ipcidr',
+        format: 'mrs',
+        url: 'https://github.com/legiz-ru/mihomo-rule-sets/raw/main/ru-bundle/rknasnblock.mrs',
+        path: './rule-sets/rknasnblock.mrs',
+        interval: 86400
+      },
       'ru_apps': {
         type: 'http',
         behavior: 'classical',
@@ -722,6 +738,8 @@ function generateConfig(userName, ruProviderUrl, foreignProviderUrl, excludePack
       'OR,((RULE-SET,geosite-openai),(RULE-SET,google-gemini),(RULE-SET,geosite-anthropic),(DOMAIN-KEYWORD,grok),(DOMAIN-SUFFIX,grok.com),(DOMAIN-SUFFIX,appcenter.ms),(DOMAIN-KEYWORD,copilot),(DOMAIN-SUFFIX,copilot.microsoft.com),(PROCESS-NAME-REGEX,(?i).*(chatgpt|claude|copilot|gemini|cursor|windsurf|cline|antigravity|opencode).*),(PROCESS-NAME,opencode),(PROCESS-NAME,com.openai.chatgpt),(PROCESS-NAME,com.anthropic.claude),(PROCESS-NAME,com.microsoft.copilot),(PROCESS-NAME,ai.perplexity.app.android)),🤖 AI (Нейронки)',
       'RULE-SET,geosite-supercell,👾 Brawl Stars',
       'RULE-SET,ru-blocked,🚫 Заблокированные сайты (RU)',
+      'RULE-SET,ru-bundle,🚫 Заблокированные сайты (RU)',
+      'RULE-SET,rknasnblock,🚫 Заблокированные сайты (RU)',
       'RULE-SET,category-porn,🔞 18+',
       'RULE-SET,my-rules,📋 My Rules',
       'GEOIP,RU,DIRECT',
