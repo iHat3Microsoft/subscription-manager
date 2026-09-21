@@ -92,3 +92,7 @@ payload:
 # Rutracker
 - DOMAIN-SUFFIX,rutracker.org
 - DOMAIN-KEYWORD,rutracker
+
+# Photopea (онлайн фоторедактор)
+- DOMAIN-SUFFIX,photopea.com
+- DOMAIN-KEYWORD,photopea
