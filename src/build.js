@@ -15,7 +15,9 @@ if (!fs.existsSync(PROVIDERS_DIR)) fs.mkdirSync(PROVIDERS_DIR, { recursive: true
 if (!fs.existsSync(CONFIGS_DIR)) fs.mkdirSync(CONFIGS_DIR, { recursive: true });
 
 // Environment or default base URL for providers
-const BASE_URL = process.env.BASE_URL || 'https://sub.k3k.lol';
+// (trailing slash is normalized away: BASE_URL=https://host/ must not
+// produce double slashes in provider/config URLs)
+const BASE_URL = (process.env.BASE_URL || 'https://sub.k3k.lol').replace(/\/+$/, '');
 
 // Кэш списка RU-пакетов (legiz) — чтобы не качать при каждом билде
 // Список маленький (~20 KB), кладём рядом с data/, но в .gitignore
@@ -23,48 +25,8 @@ const RU_APP_LIST_URL = 'https://raw.githubusercontent.com/legiz-ru/mihomo-rule-
 const RU_APP_LIST_CACHE = path.join(DATA_DIR, '.ru-app-list.yaml');
 const RU_APP_LIST_TTL_MS = 7 * 24 * 60 * 60 * 1000; // 7 days TTL
 
-function downloadRuAppList() {
-  const { execSync } = require('child_process');
-  fs.mkdirSync(path.dirname(RU_APP_LIST_CACHE), { recursive: true });
-  execSync(`curl -fsSL "${RU_APP_LIST_URL}" -o "${RU_APP_LIST_CACHE}.tmp"`);
-  fs.renameSync(`${RU_APP_LIST_CACHE}.tmp`, RU_APP_LIST_CACHE);
-}
-
-function loadRuPackages() {
-  let raw;
-  const exists = fs.existsSync(RU_APP_LIST_CACHE);
-  let isExpired = false;
-
-  if (exists) {
-    try {
-      const stat = fs.statSync(RU_APP_LIST_CACHE);
-      if (Date.now() - stat.mtimeMs > RU_APP_LIST_TTL_MS) {
-        isExpired = true;
-      }
-    } catch {
-      isExpired = true;
-    }
-  }
-
-  if (!exists || isExpired) {
-    try {
-      console.log(isExpired
-        ? '[info] ru-app-list cache expired (> 7 days), re-downloading from legiz ...'
-        : '[info] downloading ru-app-list.yaml from legiz ...');
-      downloadRuAppList();
-      raw = fs.readFileSync(RU_APP_LIST_CACHE, 'utf8');
-    } catch (e) {
-      if (exists) {
-        console.warn(`[warn] failed to refresh ru-app-list (${e.message}), using stale cache`);
-        raw = fs.readFileSync(RU_APP_LIST_CACHE, 'utf8');
-      } else {
-        throw e;
-      }
-    }
-  } else {
-    raw = fs.readFileSync(RU_APP_LIST_CACHE, 'utf8');
-  }
-
+function parseRuAppList(raw) {
+  if (!raw || !raw.trim()) throw new Error('empty cache file');
   const parsed = yaml.load(raw);
   const pkgs = [];
   for (const line of (parsed && parsed.payload) || []) {
@@ -74,46 +36,75 @@ function loadRuPackages() {
   return [...new Set(pkgs)].sort();
 }
 
+function downloadRuAppList() {
+  const { execSync } = require('child_process');
+  fs.mkdirSync(path.dirname(RU_APP_LIST_CACHE), { recursive: true });
+  execSync(`curl -fsSL "${RU_APP_LIST_URL}" -o "${RU_APP_LIST_CACHE}.tmp"`);
+  fs.renameSync(`${RU_APP_LIST_CACHE}.tmp`, RU_APP_LIST_CACHE);
+}
+
+function loadRuPackages() {
+  const exists = fs.existsSync(RU_APP_LIST_CACHE);
+  let isExpired = false;
+
+  if (exists) {
+    try {
+      const stat = fs.statSync(RU_APP_LIST_CACHE);
+      if (Date.now() - stat.mtimeMs > RU_APP_LIST_TTL_MS) {
+        isExpired = true;
+      } else {
+        const pkgs = parseRuAppList(fs.readFileSync(RU_APP_LIST_CACHE, 'utf8'));
+        if (pkgs.length > 0) return pkgs;
+        console.warn('[warn] ru-app-list cache has 0 packages, re-downloading');
+        isExpired = true;
+      }
+    } catch (e) {
+      console.warn(`[warn] ru-app-list cache corrupt (${e.message}), re-downloading`);
+      isExpired = true;
+    }
+  }
+
+  try {
+    console.log(isExpired
+      ? '[info] ru-app-list cache expired/invalid, re-downloading from legiz ...'
+      : '[info] downloading ru-app-list.yaml from legiz ...');
+    downloadRuAppList();
+    return parseRuAppList(fs.readFileSync(RU_APP_LIST_CACHE, 'utf8'));
+  } catch (e) {
+    if (exists) {
+      console.warn(`[warn] failed to refresh ru-app-list (${e.message}), falling back to existing cache`);
+      try {
+        return parseRuAppList(fs.readFileSync(RU_APP_LIST_CACHE, 'utf8'));
+      } catch {
+        throw e;
+      }
+    }
+    throw e;
+  }
+}
+
 // Helper to parse a single text chunk (file content)
 async function parseProxy(content, baseName) {
   content = content.trim();
   if (!content) return null;
 
-  // Try JSON first (AmneziaWG/Xray containers)
+  // Try JSON first (AmneziaWG/Xray containers) — same parser as vpn:// links
   try {
     const json = JSON.parse(content);
     if (json.containers) {
-      for (const container of json.containers) {
-        if (container.awg) {
-          const p = parsers.parseAmneziaAwgProxy(json, container);
-          if (p) return p;
-        } else if (container.wireguard) {
-          const p = parsers.parseAmneziaWireGuardProxy(json, container);
-          if (p) return p;
-        } else if (container.xray) {
-          const p = parsers.parseAmneziaVlessProxy(json, container);
-          if (p) return p;
-        }
-      }
+      const p = parsers.parseAmneziaVpnJson(json);
+      if (p) return p;
     }
-  } catch (e) {
+  } catch {
     // Not JSON
   }
 
   // Try HTTP subscription URL -> inline ingest of Marzban-style YAML.
-  // We fetch with User-Agent: clash.meta so the panel returns the full
-  // Clash YAML (mode/port/proxies/proxy-groups/rules), then extract
-  // proxies[] and return as a LIST so the caller treats each as its
-  // own proxy entry in the master provider file. This way admin
-  // adding a new inbound to Marzban shows up on the next `node build.js`
-  // without modifying any per-user State.
   if (/^https?:\/\//.test(content)) {
     const fetched = await ingestHttpProxyList(content);
     if (fetched && fetched.length > 0) {
       return fetched;
     }
-    // Falls back: if the URL turned out to be unreachable, leave a
-    // proxy-provider link so the end user can debug (mihomo will retry).
     const sub = parsers.parseSubscriptionUrl(content);
     if (sub) {
       sub.name = `sub-${baseName || 'unknown'}`;
@@ -126,14 +117,7 @@ async function parseProxy(content, baseName) {
   const urlProxy = await parsers.parseProxyUrl(content);
   if (urlProxy) return urlProxy;
 
-  // If it's a raw .conf file text (like standard Wireguard/AmneziaWG)
-  // We can wrap it in a mock JSON structure to feed it to our parser, or 
-  // we can manually parse it if needed. For now, since the user said 
-  // AmneziaWG gives JSON keys, we rely on JSON.
-  // Wait! A .conf file is INI format. The frontend didn't natively parse pure INI without the json wrapper.
-  // If we need pure .conf parsing, we can add it here.
-
-  // Try raw WG/AWG .conf format
+  // Raw WG/AWG .conf file (INI format)
   if (content.includes('[Interface]') && content.includes('[Peer]')) {
     return parsers.parseWireGuardConfig(content);
   }
@@ -142,9 +126,6 @@ async function parseProxy(content, baseName) {
 }
 
 // In-memory cache of <URL> -> parsed Marzban YAML body.
-// Lives only for one `node build.js` invocation: restarting the
-// script re-fetches. Same URL seen again across multiple users in the
-// same run -> fetched once.
 const _urlCache = new Map();
 
 async function ingestHttpProxyList(url) {
@@ -182,10 +163,6 @@ async function ingestHttpProxyList(url) {
   });
 }
 
-// parseProxy() may return either a single proxy object OR an Array of
-// proxies (when HTTP ingest expanded Marzban's proxies[]). Normalize
-// to always return Array; rename per caller-supplied baseName so the
-// final master provider file lists them as <baseName>[-N].
 function asProxyList(result, baseName) {
   if (!result) return [];
   const list = Array.isArray(result) ? result : [result];
@@ -201,6 +178,552 @@ function asProxyList(result, baseName) {
     });
 }
 
+function buildDns() {
+  return {
+    enable: true,
+    listen: '127.0.0.1:6868',
+    ipv6: false,
+    'prefer-ipv4': true,
+    'enhanced-mode': 'fake-ip',
+    'fake-ip-range': '198.18.0.0/15',
+    'fake-ip-filter': [
+      '*.lan',
+      '*.local',
+      '+.msftconnecttest.com',
+      '+.telegram.org',
+      '+.t.me'
+    ],
+    'default-nameserver': ['8.8.8.8', '1.1.1.1', '9.9.9.9'],
+    nameserver: [
+      'https://8.8.8.8/dns-query',
+      'https://cloudflare-dns.com/dns-query'
+    ],
+    'nameserver-policy': {
+      'geosite:category-ru': ['77.88.8.8', '8.8.8.8']
+    }
+  };
+}
+
+function buildTun(excludePackages) {
+  return {
+    enable: true,
+    stack: 'mixed',
+    'inet6-address': 'fd00::1/128',
+    'auto-route': true,
+    'auto-detect-interface': true,
+    'dns-hijack': ['any:53', 'tcp://any:53'],
+    'strict-route': true,
+    'route-exclude-address': [
+      '0.0.0.0/8', '10.0.0.0/8', '100.64.0.0/10', '127.0.0.0/8',
+      '169.254.0.0/16', '172.16.0.0/12', '192.0.0.0/24', '192.0.2.0/24',
+      '192.88.99.0/24', '192.168.0.0/16', '198.51.100.0/24', '203.0.113.0/24',
+      '224.0.0.0/3', '::/127', 'fc00::/7', 'fe80::/10', 'ff00::/8'
+    ],
+    'exclude-package': excludePackages
+  };
+}
+
+function buildSniffer() {
+  return {
+    enable: true,
+    'force-dns-mapping': true,
+    'parse-pure-ip': true,
+    sniff: {
+      HTTP: { ports: [80, '8080-8880'], 'override-destination': true },
+      TLS: { ports: [443, 8443] }
+    }
+  };
+}
+
+function httpProxyProvider(url, providerPath) {
+  return {
+    type: 'http',
+    interval: 3600,
+    url,
+    path: providerPath,
+    'health-check': {
+      enable: true,
+      lazy: true,
+      interval: 900,
+      url: 'https://www.gstatic.com/generate_204'
+    }
+  };
+}
+
+function buildProxyProviders(ruProviderUrl, foreignProviderUrl) {
+  return {
+    ru_servers: httpProxyProvider(ruProviderUrl, './proxy-providers/ru_servers.yaml'),
+    foreign_servers: httpProxyProvider(foreignProviderUrl, './proxy-providers/foreign_servers.yaml')
+  };
+}
+
+function buildProxyGroups() {
+  return [
+    {
+      name: '♻️ Автовыбор (Иностранные)',
+      type: 'fallback',
+      hidden: true,
+      lazy: true,
+      url: 'https://www.gstatic.com/generate_204',
+      interval: 300,
+      timeout: 5000,
+      'max-failed-times': 5,
+      use: ['foreign_servers']
+    },
+    {
+      name: '♻️ Автовыбор (Россия)',
+      type: 'fallback',
+      hidden: true,
+      lazy: true,
+      url: 'https://www.gstatic.com/generate_204',
+      interval: 300,
+      timeout: 5000,
+      'max-failed-times': 5,
+      use: ['ru_servers']
+    },
+    {
+      name: '♻️ Резерв (RU -> EU)',
+      type: 'fallback',
+      hidden: true,
+      lazy: true,
+      url: 'https://www.gstatic.com/generate_204',
+      interval: 300,
+      timeout: 5000,
+      'max-failed-times': 5,
+      use: ['ru_servers', 'foreign_servers']
+    },
+    {
+      name: '🌍 Иностранные серверы',
+      type: 'select',
+      icon: 'https://cdn.jsdelivr.net/gh/Koolson/Qure@master/IconSet/Color/Global.png',
+      proxies: ['♻️ Автовыбор (Иностранные)'],
+      use: ['foreign_servers']
+    },
+    {
+      name: '🚫 Заблокированные сайты (RU)',
+      type: 'select',
+      hidden: true,
+      icon: 'https://raw.githubusercontent.com/remnawave/templates/refs/heads/main/icons/Blocked.png',
+      proxies: ['🌍 Иностранные серверы', 'DIRECT'],
+      use: ['foreign_servers']
+    },
+    {
+      name: '🔞 18+',
+      type: 'select',
+      hidden: true,
+      icon: 'https://cdn.jsdelivr.net/gh/Koolson/Qure@master/IconSet/Color/Pornhub.png',
+      proxies: ['🌍 Иностранные серверы', 'DIRECT'],
+      use: ['foreign_servers']
+    },
+    {
+      name: '🚫 Реклама',
+      type: 'select',
+      icon: 'https://raw.githubusercontent.com/remnawave/templates/refs/heads/main/icons/AdBlock.png',
+      proxies: ['REJECT', 'DIRECT', '🌍 Иностранные серверы'],
+      use: ['foreign_servers']
+    },
+    {
+      name: '🌐 Остальной трафик (MATCH)',
+      type: 'select',
+      icon: 'https://cdn.jsdelivr.net/gh/Koolson/Qure@master/IconSet/Color/Auto.png',
+      proxies: ['DIRECT', '🌍 Иностранные серверы'],
+      use: ['foreign_servers']
+    },
+    {
+      name: '🔎 Google',
+      type: 'select',
+      hidden: true,
+      icon: 'https://cdn.jsdelivr.net/gh/Koolson/Qure@master/IconSet/Color/Google_Search.png',
+      proxies: ['DIRECT', '🌍 Иностранные серверы'],
+      use: ['foreign_servers']
+    },
+    {
+      name: '💬 Discord',
+      type: 'select',
+      hidden: true,
+      icon: 'https://raw.githubusercontent.com/remnawave/templates/refs/heads/main/icons/Discord.png',
+      proxies: ['♻️ Резерв (RU -> EU)', '🌍 Иностранные серверы', 'DIRECT'],
+      use: ['ru_servers', 'foreign_servers']
+    },
+    {
+      name: '📞 WhatsApp',
+      type: 'select',
+      hidden: true,
+      icon: 'https://cdn.jsdelivr.net/gh/Koolson/Qure@master/IconSet/Color/WhatsApp.png',
+      proxies: ['🌍 Иностранные серверы', 'DIRECT'],
+      use: ['foreign_servers']
+    },
+    {
+      name: '▶️ YouTube',
+      type: 'select',
+      hidden: true,
+      icon: 'https://cdn.jsdelivr.net/gh/Koolson/Qure@master/IconSet/Color/YouTube.png',
+      proxies: ['♻️ Резерв (RU -> EU)', '🌍 Иностранные серверы', 'DIRECT'],
+      use: ['ru_servers', 'foreign_servers']
+    },
+    {
+      name: '📸 Instagram & Threads',
+      type: 'select',
+      hidden: true,
+      icon: 'https://cdn.jsdelivr.net/gh/Koolson/Qure@master/IconSet/Color/Instagram.png',
+      proxies: ['🌍 Иностранные серверы'],
+      use: ['foreign_servers']
+    },
+    {
+      name: '➤ Telegram',
+      type: 'select',
+      hidden: true,
+      icon: 'https://cdn.jsdelivr.net/gh/Koolson/Qure@master/IconSet/Color/Telegram.png',
+      proxies: ['🌍 Иностранные серверы', 'DIRECT'],
+      use: ['foreign_servers']
+    },
+    {
+      name: '🎵 TikTok',
+      type: 'select',
+      hidden: true,
+      icon: 'https://cdn.jsdelivr.net/gh/Koolson/Qure@master/IconSet/Color/TikTok.png',
+      proxies: ['🌍 Иностранные серверы'],
+      use: ['foreign_servers']
+    },
+    {
+      name: '🤖 AI (Нейронки)',
+      type: 'select',
+      hidden: true,
+      icon: 'https://cdn.jsdelivr.net/gh/Koolson/Qure@master/IconSet/Color/Spark.png',
+      proxies: ['🌍 Иностранные серверы'],
+      use: ['foreign_servers']
+    },
+    {
+      name: '👾 Brawl Stars',
+      type: 'select',
+      hidden: true,
+      icon: 'https://cdn.jsdelivr.net/gh/Koolson/Qure@master/IconSet/Color/Game.png',
+      proxies: ['🌍 Иностранные серверы'],
+      use: ['foreign_servers']
+    },
+    {
+      name: '👥 Facebook',
+      type: 'select',
+      hidden: true,
+      icon: 'https://cdn.jsdelivr.net/gh/Koolson/Qure@master/IconSet/Color/Facebook.png',
+      proxies: ['🌍 Иностранные серверы'],
+      use: ['foreign_servers']
+    },
+    {
+      name: '🇷🇺 Российские серверы',
+      type: 'select',
+      hidden: true,
+      icon: 'https://cdn.jsdelivr.net/gh/Koolson/Qure@master/IconSet/Color/Russia.png',
+      proxies: ['♻️ Автовыбор (Россия)'],
+      use: ['ru_servers']
+    },
+    {
+      name: '🎮 Игры (DIRECT)',
+      type: 'select',
+      hidden: true,
+      icon: 'https://cdn.jsdelivr.net/gh/Koolson/Qure@master/IconSet/Color/Game.png',
+      proxies: ['DIRECT', '🌍 Иностранные серверы'],
+      use: ['foreign_servers']
+    },
+    {
+      name: '📋 My Rules',
+      type: 'select',
+      hidden: true,
+      proxies: ['🌍 Иностранные серверы', 'DIRECT'],
+      use: ['foreign_servers']
+    }
+  ];
+}
+
+function buildRuleProviders() {
+  return {
+    oisd_big: {
+      type: 'http',
+      behavior: 'domain',
+      format: 'mrs',
+      url: 'https://github.com/legiz-ru/mihomo-rule-sets/raw/main/oisd/big.mrs',
+      path: './rule-sets/oisd_big.mrs',
+      interval: 86400
+    },
+    discord_voiceips: {
+      behavior: 'ipcidr',
+      type: 'http',
+      format: 'mrs',
+      url: 'https://github.com/legiz-ru/mihomo-rule-sets/raw/main/other/discord-voice-ip-list.mrs',
+      path: './rule-sets/discord_voiceips.mrs',
+      interval: 86400
+    },
+    'category-porn': {
+      type: 'http',
+      behavior: 'domain',
+      format: 'mrs',
+      url: 'https://github.com/MetaCubeX/meta-rules-dat/raw/meta/geo/geosite/category-porn.mrs',
+      path: './rule-sets/category-porn.mrs',
+      interval: 86400
+    },
+    'geosite-youtube': {
+      behavior: 'domain',
+      type: 'http',
+      format: 'mrs',
+      url: 'https://github.com/MetaCubeX/meta-rules-dat/raw/meta/geo/geosite/youtube.mrs',
+      path: './rule-sets/youtube.mrs',
+      interval: 86400
+    },
+    'geosite-discord': {
+      behavior: 'domain',
+      type: 'http',
+      format: 'mrs',
+      url: 'https://github.com/MetaCubeX/meta-rules-dat/raw/meta/geo/geosite/discord.mrs',
+      path: './rule-sets/discord.mrs',
+      interval: 86400
+    },
+    'geosite-instagram': {
+      behavior: 'domain',
+      type: 'http',
+      format: 'mrs',
+      url: 'https://github.com/MetaCubeX/meta-rules-dat/raw/meta/geo/geosite/instagram.mrs',
+      path: './rule-sets/instagram.mrs',
+      interval: 86400
+    },
+    'geosite-facebook': {
+      behavior: 'domain',
+      type: 'http',
+      format: 'mrs',
+      url: 'https://github.com/MetaCubeX/meta-rules-dat/raw/meta/geo/geosite/facebook.mrs',
+      path: './rule-sets/facebook.mrs',
+      interval: 86400
+    },
+    'geosite-meta': {
+      behavior: 'domain',
+      type: 'http',
+      format: 'mrs',
+      url: 'https://github.com/MetaCubeX/meta-rules-dat/raw/meta/geo/geosite/meta.mrs',
+      path: './rule-sets/meta.mrs',
+      interval: 86400
+    },
+    'geosite-tiktok': {
+      behavior: 'domain',
+      type: 'http',
+      format: 'yaml',
+      url: 'https://raw.githubusercontent.com/MetaCubeX/meta-rules-dat/refs/heads/meta/geo/geosite/tiktok.yaml',
+      path: './rule-sets/tiktok.yaml',
+      interval: 86400
+    },
+    'geosite-supercell': {
+      behavior: 'domain',
+      type: 'http',
+      format: 'mrs',
+      url: 'https://github.com/MetaCubeX/meta-rules-dat/raw/meta/geo/geosite/supercell.mrs',
+      path: './rule-sets/supercell.mrs',
+      interval: 86400
+    },
+    'geosite-soundcloud': {
+      behavior: 'domain',
+      type: 'http',
+      format: 'mrs',
+      url: 'https://github.com/MetaCubeX/meta-rules-dat/raw/meta/geo/geosite/soundcloud.mrs',
+      path: './rule-sets/soundcloud.mrs',
+      interval: 86400
+    },
+    'telegram-domains': {
+      behavior: 'domain',
+      type: 'http',
+      format: 'mrs',
+      url: 'https://github.com/MetaCubeX/meta-rules-dat/raw/meta/geo/geosite/telegram.mrs',
+      path: './rule-sets/telegram-domains.mrs',
+      interval: 86400
+    },
+    'telegram-ips': {
+      behavior: 'ipcidr',
+      type: 'http',
+      format: 'mrs',
+      url: 'https://github.com/MetaCubeX/meta-rules-dat/raw/meta/geo/geoip/telegram.mrs',
+      path: './rule-sets/telegram-ips.mrs',
+      interval: 86400
+    },
+    'geosite-google': {
+      behavior: 'domain',
+      type: 'http',
+      format: 'mrs',
+      url: 'https://github.com/MetaCubeX/meta-rules-dat/raw/meta/geo/geosite/google.mrs',
+      path: './rule-sets/google.mrs',
+      interval: 86400
+    },
+    'google-geoip': {
+      behavior: 'ipcidr',
+      type: 'http',
+      format: 'mrs',
+      url: 'https://github.com/MetaCubeX/meta-rules-dat/raw/meta/geo/geoip/google.mrs',
+      path: './rule-sets/google-geoip.mrs',
+      interval: 86400
+    },
+    'geosite-openai': {
+      behavior: 'domain',
+      type: 'http',
+      format: 'mrs',
+      url: 'https://github.com/MetaCubeX/meta-rules-dat/raw/meta/geo/geosite/openai.mrs',
+      path: './rule-sets/openai.mrs',
+      interval: 86400
+    },
+    'google-gemini': {
+      behavior: 'domain',
+      type: 'http',
+      format: 'mrs',
+      url: 'https://github.com/MetaCubeX/meta-rules-dat/raw/refs/heads/meta/geo/geosite/google-gemini.mrs',
+      path: './rule-sets/google-gemini.mrs',
+      interval: 86400
+    },
+    'geosite-anthropic': {
+      behavior: 'domain',
+      type: 'http',
+      format: 'mrs',
+      url: 'https://github.com/MetaCubeX/meta-rules-dat/raw/refs/heads/meta/geo/geosite/anthropic.mrs',
+      path: './rule-sets/anthropic.mrs',
+      interval: 86400
+    },
+    'my-rules': {
+      type: 'http',
+      behavior: 'classical',
+      format: 'yaml',
+      url: 'https://gitlab.com/chm0d755/subscription-manager/-/raw/master/my-rules.yaml',
+      path: './rule-sets/my-rules.yaml',
+      interval: 86400
+    },
+    'ru-blocked': {
+      behavior: 'classical',
+      type: 'http',
+      format: 'yaml',
+      url: 'https://cdn.jsdelivr.net/gh/shvchk/unblock-net/lists/clash/ru-blocked',
+      path: './rule-sets/ru-blocked.yaml',
+      interval: 86400
+    },
+    'ru-bundle': {
+      type: 'http',
+      behavior: 'domain',
+      format: 'mrs',
+      url: 'https://github.com/legiz-ru/mihomo-rule-sets/raw/main/ru-bundle/rule.mrs',
+      path: './rule-sets/ru-bundle.mrs',
+      interval: 86400
+    },
+    'rknasnblock': {
+      type: 'http',
+      behavior: 'ipcidr',
+      format: 'mrs',
+      url: 'https://github.com/legiz-ru/mihomo-rule-sets/raw/main/ru-bundle/rknasnblock.mrs',
+      path: './rule-sets/rknasnblock.mrs',
+      interval: 86400
+    },
+    'ru_apps': {
+      type: 'http',
+      behavior: 'classical',
+      format: 'yaml',
+      url: 'https://github.com/legiz-ru/mihomo-rule-sets/raw/main/other/ru-app-list.yaml',
+      path: './rule-sets/ru-apps.yaml',
+      interval: 86400
+    },
+    'whatsapp-domains': {
+      type: 'http',
+      behavior: 'domain',
+      format: 'mrs',
+      interval: 86400,
+      url: 'https://github.com/MetaCubeX/meta-rules-dat/raw/meta/geo/geosite/whatsapp.mrs',
+      path: './rule-sets/whatsapp-domains.mrs'
+    },
+    'facebook-ips': {
+      type: 'http',
+      behavior: 'ipcidr',
+      format: 'mrs',
+      interval: 86400,
+      url: 'https://github.com/MetaCubeX/meta-rules-dat/raw/meta/geo/geoip/facebook.mrs',
+      path: './rule-sets/facebook-ips.mrs'
+    },
+    'torrent-trackers': {
+      type: 'http',
+      behavior: 'domain',
+      format: 'mrs',
+      url: 'https://github.com/legiz-ru/mihomo-rule-sets/raw/main/other/torrent-trackers.mrs',
+      path: './rule-sets/torrent-trackers.mrs',
+      interval: 86400
+    },
+    'torrent-clients': {
+      type: 'http',
+      behavior: 'classical',
+      format: 'yaml',
+      url: 'https://github.com/legiz-ru/mihomo-rule-sets/raw/main/other/torrent-clients.yaml',
+      path: './rule-sets/torrent-clients.yaml',
+      interval: 86400
+    },
+    'games-direct': {
+      type: 'http',
+      behavior: 'classical',
+      format: 'yaml',
+      url: 'https://github.com/legiz-ru/mihomo-rule-sets/raw/main/other/games-direct.yaml',
+      path: './rule-sets/games-direct.yaml',
+      interval: 86400
+    },
+    discord_vc: {
+      type: 'inline',
+      behavior: 'classical',
+      payload: [
+        'AND,((IP-CIDR,138.128.136.0/21),(NETWORK,udp),(DST-PORT,50000-50100))',
+        'AND,((IP-CIDR,162.158.0.0/15),(NETWORK,udp),(DST-PORT,50000-50100))',
+        'AND,((IP-CIDR,172.64.0.0/13),(NETWORK,udp),(DST-PORT,50000-50100))',
+        'AND,((IP-CIDR,34.0.0.0/15),(NETWORK,udp),(DST-PORT,50000-50100))',
+        'AND,((IP-CIDR,34.2.0.0/15),(NETWORK,udp),(DST-PORT,50000-50100))',
+        'AND,((IP-CIDR,35.192.0.0/12),(NETWORK,udp),(DST-PORT,50000-50100))',
+        'AND,((IP-CIDR,35.208.0.0/12),(NETWORK,udp),(DST-PORT,50000-50100))',
+        'AND,((IP-CIDR,5.200.14.128/25),(NETWORK,udp),(DST-PORT,50000-50100))',
+        'AND,((IP-CIDR,66.22.192.0/18),(NETWORK,udp),(DST-PORT,50000-50100))'
+      ]
+    }
+  };
+}
+
+function buildRules() {
+  return [
+    'RULE-SET,oisd_big,🚫 Реклама',
+    'RULE-SET,games-direct,🎮 Игры (DIRECT)',
+    'RULE-SET,torrent-clients,DIRECT',
+    'PROCESS-NAME-REGEX,(?i).*torrent.*,DIRECT',
+    'RULE-SET,torrent-trackers,🌍 Иностранные серверы',
+    'RULE-SET,ru_apps,DIRECT',
+    'IP-CIDR,127.0.0.0/8,DIRECT,no-resolve',
+    'IP-CIDR,192.168.0.0/16,DIRECT,no-resolve',
+    'IP-CIDR,10.0.0.0/8,DIRECT,no-resolve',
+    'IP-CIDR,172.16.0.0/12,DIRECT,no-resolve',
+    'AND,((NETWORK,tcp),(DST-PORT,22)),DIRECT',
+    'PROCESS-NAME,ssh,DIRECT',
+    'RULE-SET,geosite-youtube,▶️ YouTube',
+    'OR,((RULE-SET,geosite-discord),(RULE-SET,discord_voiceips),(PROCESS-NAME,Discord.exe)),💬 Discord',
+    'RULE-SET,discord_vc,💬 Discord',
+    'PROCESS-NAME,com.instagram.android,📸 Instagram & Threads',
+    'PROCESS-NAME,com.instagram.barcelona,📸 Instagram & Threads',
+    'OR,((RULE-SET,geosite-instagram),(RULE-SET,geosite-meta),(DOMAIN-SUFFIX,cdninstagram.com),(DOMAIN-SUFFIX,fbcdn.net),(DOMAIN-SUFFIX,fbsbx.com),(DOMAIN-SUFFIX,instagram.com),(DOMAIN-SUFFIX,threads.net),(DOMAIN-SUFFIX,graph.instagram.com),(DOMAIN-SUFFIX,graph.facebook.com),(DOMAIN-KEYWORD,instagram)),📸 Instagram & Threads',
+    'IP-ASN,32934,📸 Instagram & Threads',
+    'OR,((RULE-SET,facebook-ips),(RULE-SET,whatsapp-domains)),📞 WhatsApp',
+    'RULE-SET,geosite-facebook,👥 Facebook',
+    'OR,((RULE-SET,telegram-ips),(RULE-SET,telegram-domains)),➤ Telegram',
+    'PROCESS-NAME-REGEX,(?i).*ayugram.*,➤ Telegram',
+    'PROCESS-NAME-REGEX,(?i).*telegram.*,➤ Telegram',
+    'PROCESS-NAME,org.telegram.messenger,➤ Telegram',
+    'RULE-SET,geosite-tiktok,🎵 TikTok',
+    'RULE-SET,geosite-soundcloud,🌍 Иностранные серверы',
+    'OR,((RULE-SET,geosite-openai),(RULE-SET,google-gemini),(RULE-SET,geosite-anthropic),(DOMAIN-KEYWORD,grok),(DOMAIN-SUFFIX,grok.com),(DOMAIN-SUFFIX,appcenter.ms),(DOMAIN-KEYWORD,copilot),(DOMAIN-SUFFIX,copilot.microsoft.com),(PROCESS-NAME-REGEX,(?i).*(chatgpt|claude|copilot|gemini|cursor|windsurf|cline|antigravity|opencode).*),(PROCESS-NAME,opencode),(PROCESS-NAME,com.openai.chatgpt),(PROCESS-NAME,com.anthropic.claude),(PROCESS-NAME,com.microsoft.copilot),(PROCESS-NAME,ai.perplexity.app.android)),🤖 AI (Нейронки)',
+    'RULE-SET,geosite-supercell,👾 Brawl Stars',
+    'RULE-SET,ru-blocked,🚫 Заблокированные сайты (RU)',
+    'RULE-SET,ru-bundle,🚫 Заблокированные сайты (RU)',
+    'RULE-SET,rknasnblock,🚫 Заблокированные сайты (RU)',
+    'RULE-SET,category-porn,🔞 18+',
+    'RULE-SET,my-rules,📋 My Rules',
+    'GEOIP,RU,DIRECT',
+    'DOMAIN-SUFFIX,ru,DIRECT',
+    'DOMAIN-SUFFIX,рф,DIRECT',
+    'DOMAIN-SUFFIX,su,DIRECT',
+    'OR,((RULE-SET,google-geoip),(RULE-SET,geosite-google)),🔎 Google',
+    'MATCH,🌐 Остальной трафик (MATCH)'
+  ];
+}
+
 // Generate the complete Mihomo config template for a user
 function generateConfig(userName, ruProviderUrl, foreignProviderUrl, excludePackages = []) {
   return {
@@ -211,545 +734,35 @@ function generateConfig(userName, ruProviderUrl, foreignProviderUrl, excludePack
     'unified-delay': true,
     'tcp-concurrent': true,
 
-    dns: {
-      enable: true,
-      listen: '127.0.0.1:6868',
-      ipv6: false,
-      'prefer-ipv4': true,
-      'enhanced-mode': 'fake-ip',
-      'fake-ip-range': '198.18.0.0/15',
-      'fake-ip-filter': [
-        '*.lan',
-        '*.local',
-        '+.msftconnecttest.com',
-        '+.telegram.org',
-        '+.t.me'
-      ],
-      'default-nameserver': ['8.8.8.8', '1.1.1.1', '9.9.9.9'],
-      nameserver: [
-        'https://8.8.8.8/dns-query',
-        'https://cloudflare-dns.com/dns-query'
-      ],
-      'nameserver-policy': {
-        'geosite:category-ru': ['77.88.8.8', '8.8.8.8']
-      }
-    },
-
-    tun: {
-      enable: true,
-      stack: 'mixed',
-      'inet6-address': 'fd00::1/128',
-      'auto-route': true,
-      'auto-detect-interface': true,
-      'dns-hijack': ['any:53', 'tcp://any:53'],
-      'strict-route': true,
-      'route-exclude-address': [
-        '0.0.0.0/8', '10.0.0.0/8', '100.64.0.0/10', '127.0.0.0/8',
-        '169.254.0.0/16', '172.16.0.0/12', '192.0.0.0/24', '192.0.2.0/24',
-        '192.88.99.0/24', '192.168.0.0/16', '198.51.100.0/24', '203.0.113.0/24',
-        '224.0.0.0/3', '::/127', 'fc00::/7', 'fe80::/10', 'ff00::/8'
-      ],
-      'exclude-package': excludePackages
-    },
-
-    sniffer: {
-      enable: true,
-      'force-dns-mapping': true,
-      'parse-pure-ip': true,
-      sniff: {
-        HTTP: { ports: [80, '8080-8880'], 'override-destination': true },
-        TLS: { ports: [443, 8443] }
-      }
-    },
-
-    'proxy-providers': {
-      ru_servers: {
-        type: 'http',
-        interval: 3600,
-        url: ruProviderUrl,
-        path: './proxy-providers/ru_servers.yaml',
-        'health-check': {
-          enable: true,
-          lazy: true,
-          interval: 900,
-          url: 'https://www.gstatic.com/generate_204'
-        }
-      },
-      foreign_servers: {
-        type: 'http',
-        interval: 3600,
-        url: foreignProviderUrl,
-        path: './proxy-providers/foreign_servers.yaml',
-        'health-check': {
-          enable: true,
-          lazy: true,
-          interval: 900,
-          url: 'https://www.gstatic.com/generate_204'
-        }
-      }
-    },
-
-    'proxy-groups': [
-      {
-        name: '♻️ Автовыбор (Иностранные)',
-        type: 'fallback',
-        hidden: true,
-        lazy: true,
-        url: 'https://www.gstatic.com/generate_204',
-        interval: 300,
-        timeout: 5000,
-        'max-failed-times': 5,
-        use: ['foreign_servers']
-      },
-      {
-        name: '♻️ Автовыбор (Россия)',
-        type: 'fallback',
-        hidden: true,
-        lazy: true,
-        url: 'https://www.gstatic.com/generate_204',
-        interval: 300,
-        timeout: 5000,
-        'max-failed-times': 5,
-        use: ['ru_servers']
-      },
-      {
-        name: '♻️ Резерв (RU -> EU)',
-        type: 'fallback',
-        hidden: true,
-        lazy: true,
-        url: 'https://www.gstatic.com/generate_204',
-        interval: 300,
-        timeout: 5000,
-        'max-failed-times': 5,
-        use: ['ru_servers', 'foreign_servers']
-      },
-      {
-        name: '🌍 Иностранные серверы',
-        type: 'select',
-        icon: 'https://cdn.jsdelivr.net/gh/Koolson/Qure@master/IconSet/Color/Global.png',
-        proxies: ['♻️ Автовыбор (Иностранные)'],
-        use: ['foreign_servers']
-      },
-      {
-        name: '🚫 Заблокированные сайты (RU)',
-        type: 'select',
-        hidden: true,
-        icon: 'https://raw.githubusercontent.com/remnawave/templates/refs/heads/main/icons/Blocked.png',
-        proxies: ['🌍 Иностранные серверы', 'DIRECT'],
-        use: ['foreign_servers']
-      },
-      {
-        name: '🔞 18+',
-        type: 'select',
-        hidden: true,
-        icon: 'https://cdn.jsdelivr.net/gh/Koolson/Qure@master/IconSet/Color/Pornhub.png',
-        proxies: ['🌍 Иностранные серверы', 'DIRECT'],
-        use: ['foreign_servers']
-      },
-      {
-        name: '🚫 Реклама',
-        type: 'select',
-        icon: 'https://raw.githubusercontent.com/remnawave/templates/refs/heads/main/icons/AdBlock.png',
-        proxies: ['REJECT', 'DIRECT', '🌍 Иностранные серверы'],
-        use: ['foreign_servers']
-      },
-      {
-        name: '🌐 Остальной трафик (MATCH)',
-        type: 'select',
-        icon: 'https://cdn.jsdelivr.net/gh/Koolson/Qure@master/IconSet/Color/Auto.png',
-        proxies: ['DIRECT', '🌍 Иностранные серверы'],
-        use: ['foreign_servers']
-      },
-      {
-        name: '🔎 Google',
-        type: 'select',
-        hidden: true,
-        icon: 'https://cdn.jsdelivr.net/gh/Koolson/Qure@master/IconSet/Color/Google_Search.png',
-        proxies: ['DIRECT', '🌍 Иностранные серверы'],
-        use: ['foreign_servers']
-      },
-      {
-        name: '💬 Discord',
-        type: 'select',
-        hidden: true,
-        icon: 'https://raw.githubusercontent.com/remnawave/templates/refs/heads/main/icons/Discord.png',
-        proxies: ['♻️ Резерв (RU -> EU)', '🌍 Иностранные серверы', 'DIRECT'],
-        use: ['ru_servers', 'foreign_servers']
-      },
-      {
-        name: '📞 WhatsApp',
-        type: 'select',
-        hidden: true,
-        icon: 'https://cdn.jsdelivr.net/gh/Koolson/Qure@master/IconSet/Color/WhatsApp.png',
-        proxies: ['🌍 Иностранные серверы', 'DIRECT'],
-        use: ['foreign_servers']
-      },
-      {
-        name: '▶️ YouTube',
-        type: 'select',
-        hidden: true,
-        icon: 'https://cdn.jsdelivr.net/gh/Koolson/Qure@master/IconSet/Color/YouTube.png',
-        proxies: ['♻️ Резерв (RU -> EU)', '🌍 Иностранные серверы', 'DIRECT'],
-        use: ['ru_servers', 'foreign_servers']
-      },
-      {
-        name: '📸 Instagram & Threads',
-        type: 'select',
-        hidden: true,
-        icon: 'https://cdn.jsdelivr.net/gh/Koolson/Qure@master/IconSet/Color/Instagram.png',
-        proxies: ['🌍 Иностранные серверы'],
-        use: ['foreign_servers']
-      },
-      {
-        name: '➤ Telegram',
-        type: 'select',
-        hidden: true,
-        icon: 'https://cdn.jsdelivr.net/gh/Koolson/Qure@master/IconSet/Color/Telegram.png',
-        proxies: ['🌍 Иностранные серверы', 'DIRECT'],
-        use: ['foreign_servers']
-      },
-      {
-        name: '🎵 TikTok',
-        type: 'select',
-        hidden: true,
-        icon: 'https://cdn.jsdelivr.net/gh/Koolson/Qure@master/IconSet/Color/TikTok.png',
-        proxies: ['🌍 Иностранные серверы'],
-        use: ['foreign_servers']
-      },
-      {
-        name: '🤖 AI (Нейронки)',
-        type: 'select',
-        hidden: true,
-        icon: 'https://cdn.jsdelivr.net/gh/Koolson/Qure@master/IconSet/Color/Spark.png',
-        proxies: ['🌍 Иностранные серверы'],
-        use: ['foreign_servers']
-      },
-      {
-        name: '👾 Brawl Stars',
-        type: 'select',
-        hidden: true,
-        icon: 'https://cdn.jsdelivr.net/gh/Koolson/Qure@master/IconSet/Color/Game.png',
-        proxies: ['🌍 Иностранные серверы'],
-        use: ['foreign_servers']
-      },
-      {
-        name: '👥 Facebook',
-        type: 'select',
-        hidden: true,
-        icon: 'https://cdn.jsdelivr.net/gh/Koolson/Qure@master/IconSet/Color/Facebook.png',
-        proxies: ['🌍 Иностранные серверы'],
-        use: ['foreign_servers']
-      },
-      {
-        name: '🇷🇺 Российские серверы',
-        type: 'select',
-        hidden: true,
-        icon: 'https://cdn.jsdelivr.net/gh/Koolson/Qure@master/IconSet/Color/Russia.png',
-        proxies: ['♻️ Автовыбор (Россия)'],
-        use: ['ru_servers']
-      },
-      {
-        name: '🎮 Игры (DIRECT)',
-        type: 'select',
-        hidden: true,
-        icon: 'https://cdn.jsdelivr.net/gh/Koolson/Qure@master/IconSet/Color/Game.png',
-        proxies: ['DIRECT', '🌍 Иностранные серверы'],
-        use: ['foreign_servers']
-      },
-      {
-        name: '📋 My Rules',
-        type: 'select',
-        hidden: true,
-        proxies: ['🌍 Иностранные серверы', 'DIRECT'],
-        use: ['foreign_servers']
-      }
-    ],
-
-    'rule-providers': {
-      oisd_big: {
-        type: 'http',
-        behavior: 'domain',
-        format: 'mrs',
-        url: 'https://github.com/legiz-ru/mihomo-rule-sets/raw/main/oisd/big.mrs',
-        path: './rule-sets/oisd_big.mrs',
-        interval: 86400
-      },
-      discord_voiceips: {
-        behavior: 'ipcidr',
-        type: 'http',
-        format: 'mrs',
-        url: 'https://github.com/legiz-ru/mihomo-rule-sets/raw/main/other/discord-voice-ip-list.mrs',
-        path: './rule-sets/discord_voiceips.mrs',
-        interval: 86400
-      },
-      'category-porn': {
-        type: 'http',
-        behavior: 'domain',
-        format: 'mrs',
-        url: 'https://github.com/MetaCubeX/meta-rules-dat/raw/meta/geo/geosite/category-porn.mrs',
-        path: './rule-sets/category-porn.mrs',
-        interval: 86400
-      },
-      'geosite-youtube': {
-        behavior: 'domain',
-        type: 'http',
-        format: 'mrs',
-        url: 'https://github.com/MetaCubeX/meta-rules-dat/raw/meta/geo/geosite/youtube.mrs',
-        path: './rule-sets/youtube.mrs',
-        interval: 86400
-      },
-      'geosite-discord': {
-        behavior: 'domain',
-        type: 'http',
-        format: 'mrs',
-        url: 'https://github.com/MetaCubeX/meta-rules-dat/raw/meta/geo/geosite/discord.mrs',
-        path: './rule-sets/discord.mrs',
-        interval: 86400
-      },
-      'geosite-instagram': {
-        behavior: 'domain',
-        type: 'http',
-        format: 'mrs',
-        url: 'https://github.com/MetaCubeX/meta-rules-dat/raw/meta/geo/geosite/instagram.mrs',
-        path: './rule-sets/instagram.mrs',
-        interval: 86400
-      },
-      'geosite-facebook': {
-        behavior: 'domain',
-        type: 'http',
-        format: 'mrs',
-        url: 'https://github.com/MetaCubeX/meta-rules-dat/raw/meta/geo/geosite/facebook.mrs',
-        path: './rule-sets/facebook.mrs',
-        interval: 86400
-      },
-      'geosite-meta': {
-        behavior: 'domain',
-        type: 'http',
-        format: 'mrs',
-        url: 'https://github.com/MetaCubeX/meta-rules-dat/raw/meta/geo/geosite/meta.mrs',
-        path: './rule-sets/meta.mrs',
-        interval: 86400
-      },
-      'geosite-tiktok': {
-        behavior: 'domain',
-        type: 'http',
-        format: 'yaml',
-        url: 'https://raw.githubusercontent.com/MetaCubeX/meta-rules-dat/refs/heads/meta/geo/geosite/tiktok.yaml',
-        path: './rule-sets/tiktok.yaml',
-        interval: 86400
-      },
-      'geosite-supercell': {
-        behavior: 'domain',
-        type: 'http',
-        format: 'mrs',
-        url: 'https://github.com/MetaCubeX/meta-rules-dat/raw/meta/geo/geosite/supercell.mrs',
-        path: './rule-sets/supercell.mrs',
-        interval: 86400
-      },
-      'geosite-soundcloud': {
-        behavior: 'domain',
-        type: 'http',
-        format: 'mrs',
-        url: 'https://github.com/MetaCubeX/meta-rules-dat/raw/meta/geo/geosite/soundcloud.mrs',
-        path: './rule-sets/soundcloud.mrs',
-        interval: 86400
-      },
-      'telegram-domains': {
-        behavior: 'domain',
-        type: 'http',
-        format: 'mrs',
-        url: 'https://github.com/MetaCubeX/meta-rules-dat/raw/meta/geo/geosite/telegram.mrs',
-        path: './rule-sets/telegram-domains.mrs',
-        interval: 86400
-      },
-      'telegram-ips': {
-        behavior: 'ipcidr',
-        type: 'http',
-        format: 'mrs',
-        url: 'https://github.com/MetaCubeX/meta-rules-dat/raw/meta/geo/geoip/telegram.mrs',
-        path: './rule-sets/telegram-ips.mrs',
-        interval: 86400
-      },
-      'geosite-google': {
-        behavior: 'domain',
-        type: 'http',
-        format: 'mrs',
-        url: 'https://github.com/MetaCubeX/meta-rules-dat/raw/meta/geo/geosite/google.mrs',
-        path: './rule-sets/google.mrs',
-        interval: 86400
-      },
-      'google-geoip': {
-        behavior: 'ipcidr',
-        type: 'http',
-        format: 'mrs',
-        url: 'https://github.com/MetaCubeX/meta-rules-dat/raw/meta/geo/geoip/google.mrs',
-        path: './rule-sets/google-geoip.mrs',
-        interval: 86400
-      },
-      'geosite-openai': {
-        behavior: 'domain',
-        type: 'http',
-        format: 'mrs',
-        url: 'https://github.com/MetaCubeX/meta-rules-dat/raw/meta/geo/geosite/openai.mrs',
-        path: './rule-sets/openai.mrs',
-        interval: 86400
-      },
-      'google-gemini': {
-        behavior: 'domain',
-        type: 'http',
-        format: 'mrs',
-        url: 'https://github.com/MetaCubeX/meta-rules-dat/raw/refs/heads/meta/geo/geosite/google-gemini.mrs',
-        path: './rule-sets/google-gemini.mrs',
-        interval: 86400
-      },
-      'geosite-anthropic': {
-        behavior: 'domain',
-        type: 'http',
-        format: 'mrs',
-        url: 'https://github.com/MetaCubeX/meta-rules-dat/raw/refs/heads/meta/geo/geosite/anthropic.mrs',
-        path: './rule-sets/anthropic.mrs',
-        interval: 86400
-      },
-      'my-rules': {
-        type: 'http',
-        behavior: 'classical',
-        format: 'yaml',
-        url: 'https://gitlab.com/chm0d755/subscription-manager/-/raw/master/my-rules.yaml',
-        path: './rule-sets/my-rules.yaml',
-        interval: 86400
-      },
-      'ru-blocked': {
-        behavior: 'classical',
-        type: 'http',
-        format: 'yaml',
-        url: 'https://cdn.jsdelivr.net/gh/shvchk/unblock-net/lists/clash/ru-blocked',
-        path: './rule-sets/ru-blocked.yaml',
-        interval: 86400
-      },
-      'ru-bundle': {
-        type: 'http',
-        behavior: 'domain',
-        format: 'mrs',
-        url: 'https://github.com/legiz-ru/mihomo-rule-sets/raw/main/ru-bundle/rule.mrs',
-        path: './rule-sets/ru-bundle.mrs',
-        interval: 86400
-      },
-      'rknasnblock': {
-        type: 'http',
-        behavior: 'ipcidr',
-        format: 'mrs',
-        url: 'https://github.com/legiz-ru/mihomo-rule-sets/raw/main/ru-bundle/rknasnblock.mrs',
-        path: './rule-sets/rknasnblock.mrs',
-        interval: 86400
-      },
-      'ru_apps': {
-        type: 'http',
-        behavior: 'classical',
-        format: 'yaml',
-        url: 'https://github.com/legiz-ru/mihomo-rule-sets/raw/main/other/ru-app-list.yaml',
-        path: './rule-sets/ru-apps.yaml',
-        interval: 86400
-      },
-      'whatsapp-domains': {
-        type: 'http',
-        behavior: 'domain',
-        format: 'mrs',
-        interval: 86400,
-        url: 'https://github.com/MetaCubeX/meta-rules-dat/raw/meta/geo/geosite/whatsapp.mrs',
-        path: './rule-sets/whatsapp-domains.mrs'
-      },
-      'facebook-ips': {
-        type: 'http',
-        behavior: 'ipcidr',
-        format: 'mrs',
-        interval: 86400,
-        url: 'https://github.com/MetaCubeX/meta-rules-dat/raw/meta/geo/geoip/facebook.mrs',
-        path: './rule-sets/facebook-ips.mrs'
-      },
-      'torrent-trackers': {
-        type: 'http',
-        behavior: 'domain',
-        format: 'mrs',
-        url: 'https://github.com/legiz-ru/mihomo-rule-sets/raw/main/other/torrent-trackers.mrs',
-        path: './rule-sets/torrent-trackers.mrs',
-        interval: 86400
-      },
-      'torrent-clients': {
-        type: 'http',
-        behavior: 'classical',
-        format: 'yaml',
-        url: 'https://github.com/legiz-ru/mihomo-rule-sets/raw/main/other/torrent-clients.yaml',
-        path: './rule-sets/torrent-clients.yaml',
-        interval: 86400
-      },
-      'games-direct': {
-        type: 'http',
-        behavior: 'classical',
-        format: 'yaml',
-        url: 'https://github.com/legiz-ru/mihomo-rule-sets/raw/main/other/games-direct.yaml',
-        path: './rule-sets/games-direct.yaml',
-        interval: 86400
-      },
-      'discord_vc': {
-        type: 'inline',
-        behavior: 'classical',
-        payload: [
-          'AND,((IP-CIDR,138.128.136.0/21),(NETWORK,udp),(DST-PORT,50000-50100))',
-          'AND,((IP-CIDR,162.158.0.0/15),(NETWORK,udp),(DST-PORT,50000-50100))',
-          'AND,((IP-CIDR,172.64.0.0/13),(NETWORK,udp),(DST-PORT,50000-50100))',
-          'AND,((IP-CIDR,34.0.0.0/15),(NETWORK,udp),(DST-PORT,50000-50100))',
-          'AND,((IP-CIDR,34.2.0.0/15),(NETWORK,udp),(DST-PORT,50000-50100))',
-          'AND,((IP-CIDR,35.192.0.0/12),(NETWORK,udp),(DST-PORT,50000-50100))',
-          'AND,((IP-CIDR,35.208.0.0/12),(NETWORK,udp),(DST-PORT,50000-50100))',
-          'AND,((IP-CIDR,5.200.14.128/25),(NETWORK,udp),(DST-PORT,50000-50100))',
-          'AND,((IP-CIDR,66.22.192.0/18),(NETWORK,udp),(DST-PORT,50000-50100))'
-        ]
-      }
-    },
-
-    rules: [
-      'RULE-SET,oisd_big,🚫 Реклама',
-      'RULE-SET,games-direct,🎮 Игры (DIRECT)',
-      'RULE-SET,torrent-clients,DIRECT',
-      'PROCESS-NAME-REGEX,(?i).*torrent.*,DIRECT',
-      'RULE-SET,torrent-trackers,🌍 Иностранные серверы',
-      'RULE-SET,ru_apps,DIRECT',
-      'IP-CIDR,127.0.0.0/8,DIRECT,no-resolve',
-      'IP-CIDR,192.168.0.0/16,DIRECT,no-resolve',
-      'IP-CIDR,10.0.0.0/8,DIRECT,no-resolve',
-      'IP-CIDR,172.16.0.0/12,DIRECT,no-resolve',
-      'AND,((NETWORK,tcp),(DST-PORT,22)),DIRECT',
-      'PROCESS-NAME,ssh,DIRECT',
-      'RULE-SET,geosite-youtube,▶️ YouTube',
-      'OR,((RULE-SET,geosite-discord),(RULE-SET,discord_voiceips),(PROCESS-NAME,Discord.exe)),💬 Discord',
-      'RULE-SET,discord_vc,💬 Discord',
-      'PROCESS-NAME,com.instagram.android,📸 Instagram & Threads',
-      'PROCESS-NAME,com.instagram.barcelona,📸 Instagram & Threads',
-      'OR,((RULE-SET,geosite-instagram),(RULE-SET,geosite-meta),(DOMAIN-SUFFIX,cdninstagram.com),(DOMAIN-SUFFIX,fbcdn.net),(DOMAIN-SUFFIX,fbsbx.com),(DOMAIN-SUFFIX,instagram.com),(DOMAIN-SUFFIX,threads.net),(DOMAIN-SUFFIX,graph.instagram.com),(DOMAIN-SUFFIX,graph.facebook.com),(DOMAIN-KEYWORD,instagram)),📸 Instagram & Threads',
-      'IP-ASN,32934,📸 Instagram & Threads',
-      'OR,((RULE-SET,facebook-ips),(RULE-SET,whatsapp-domains)),📞 WhatsApp',
-      'RULE-SET,geosite-facebook,👥 Facebook',
-      'OR,((RULE-SET,telegram-ips),(RULE-SET,telegram-domains)),➤ Telegram',
-      'PROCESS-NAME-REGEX,(?i).*ayugram.*,➤ Telegram',
-      'PROCESS-NAME-REGEX,(?i).*telegram.*,➤ Telegram',
-      'PROCESS-NAME,org.telegram.messenger,➤ Telegram',
-      'RULE-SET,geosite-tiktok,🎵 TikTok',
-      'RULE-SET,geosite-soundcloud,🌍 Иностранные серверы',
-      'OR,((RULE-SET,geosite-openai),(RULE-SET,google-gemini),(RULE-SET,geosite-anthropic),(DOMAIN-KEYWORD,grok),(DOMAIN-SUFFIX,grok.com),(DOMAIN-SUFFIX,appcenter.ms),(DOMAIN-KEYWORD,copilot),(DOMAIN-SUFFIX,copilot.microsoft.com),(PROCESS-NAME-REGEX,(?i).*(chatgpt|claude|copilot|gemini|cursor|windsurf|cline|antigravity|opencode).*),(PROCESS-NAME,opencode),(PROCESS-NAME,com.openai.chatgpt),(PROCESS-NAME,com.anthropic.claude),(PROCESS-NAME,com.microsoft.copilot),(PROCESS-NAME,ai.perplexity.app.android)),🤖 AI (Нейронки)',
-      'RULE-SET,geosite-supercell,👾 Brawl Stars',
-      'RULE-SET,ru-blocked,🚫 Заблокированные сайты (RU)',
-      'RULE-SET,ru-bundle,🚫 Заблокированные сайты (RU)',
-      'RULE-SET,rknasnblock,🚫 Заблокированные сайты (RU)',
-      'RULE-SET,category-porn,🔞 18+',
-      'RULE-SET,my-rules,📋 My Rules',
-      'GEOIP,RU,DIRECT',
-      'DOMAIN-SUFFIX,ru,DIRECT',
-      'DOMAIN-SUFFIX,рф,DIRECT',
-      'DOMAIN-SUFFIX,su,DIRECT',
-      'OR,((RULE-SET,google-geoip),(RULE-SET,geosite-google)),🔎 Google',
-      'MATCH,🌐 Остальной трафик (MATCH)'
-    ]
+    dns: buildDns(),
+    tun: buildTun(excludePackages),
+    sniffer: buildSniffer(),
+    'proxy-providers': buildProxyProviders(ruProviderUrl, foreignProviderUrl),
+    'proxy-groups': buildProxyGroups(),
+    'rule-providers': buildRuleProviders(),
+    rules: buildRules()
   };
+}
+
+// Read every file in a user's ru/ or foreign/ dir and collect proxies:
+// share links are parsed line-by-line, multi-line formats (raw WG/AWG
+// .conf, Amnezia JSON) are parsed as a whole file.
+async function collectProxiesFromDir(dir) {
+  const proxies = [];
+  if (!fs.existsSync(dir)) return proxies;
+  for (const f of fs.readdirSync(dir).sort()) {
+    const content = fs.readFileSync(path.join(dir, f), 'utf-8');
+    const baseName = f.replace(/\.[^/.]+$/, '');
+
+    for (const line of content.split('\n')) {
+      asProxyList(await parseProxy(line, baseName), baseName).forEach(p => proxies.push(p));
+    }
+
+    if (content.includes('[Interface]') || content.trim().startsWith('{')) {
+      asProxyList(await parseProxy(content, baseName), baseName).forEach(p => proxies.push(p));
+    }
+  }
+  return proxies;
 }
 
 // Process all users in the data directory
@@ -784,60 +797,12 @@ async function buildAll() {
       token = fs.readFileSync(tokenFile, 'utf-8').trim();
     } else {
       token = crypto.randomBytes(16).toString('hex');
-      fs.writeFileSync(tokenFile, token);
+      fs.writeFileSync(tokenFile, token, { mode: 0o600 });
       console.log(`[Info] Generated new secure token for user: ${user}`);
     }
 
-    let ruProxies = [];
-    let foreignProxies = [];
-
-    // Parse RU servers
-    if (fs.existsSync(ruDir)) {
-      const files = fs.readdirSync(ruDir).sort();
-      for (const f of files) {
-        const content = fs.readFileSync(path.join(ruDir, f), 'utf-8');
-        const lines = content.split('\n');
-        let validProxies = [];
-
-        const baseName = f.replace(/\.[^/.]+$/, "");
-
-        for (let i = 0; i < lines.length; i++) {
-          const result = await parseProxy(lines[i], baseName);
-          asProxyList(result, baseName).forEach(p => validProxies.push(p));
-        }
-
-        if (content.includes('[Interface]') || content.trim().startsWith('{')) {
-          const result = await parseProxy(content, baseName);
-          asProxyList(result, baseName).forEach(p => validProxies.push(p));
-        }
-
-        validProxies.forEach(p => ruProxies.push(p));
-      }
-    }
-
-    // Parse Foreign servers
-    if (fs.existsSync(foreignDir)) {
-      const files = fs.readdirSync(foreignDir).sort();
-      for (const f of files) {
-        const content = fs.readFileSync(path.join(foreignDir, f), 'utf-8');
-        const lines = content.split('\n');
-        const validProxies = [];
-
-        const baseName = f.replace(/\.[^/.]+$/, "");
-
-        for (let i = 0; i < lines.length; i++) {
-          const result = await parseProxy(lines[i], baseName);
-          asProxyList(result, baseName).forEach(p => validProxies.push(p));
-        }
-
-        if (content.includes('[Interface]') || content.trim().startsWith('{')) {
-          const result = await parseProxy(content, baseName);
-          asProxyList(result, baseName).forEach(p => validProxies.push(p));
-        }
-
-        validProxies.forEach(p => foreignProxies.push(p));
-      }
-    }
+    let ruProxies = await collectProxiesFromDir(ruDir);
+    let foreignProxies = await collectProxiesFromDir(foreignDir);
 
     const sortProxies = (a, b) => {
       const a10g = a.name.includes('10гбит') || a.name.includes('10G') || a.name.includes('10gbit');
@@ -873,8 +838,6 @@ async function buildAll() {
     );
 
     // Вшиваем имя профиля прямо в YAML (поддерживается многими клиентами).
-    // Default is neutral; override via env PROFILE_NAME=<my-vpn> if you
-    // want a custom name in your client UI.
     masterConfig['profile-name'] = process.env.PROFILE_NAME || 'Subscription Manager';
 
     // --- ПОЛЬЗОВАТЕЛЬСКИЕ ПЕРЕОПРЕДЕЛЕНИЯ (custom.yaml) ---
@@ -902,8 +865,7 @@ async function buildAll() {
               if (!masterConfig.tun) masterConfig.tun = {};
               masterConfig.tun['exclude-package'] = customConfig[key];
             } else if (key === 'rule-providers' && customConfig[key] && typeof customConfig[key] === 'object' && !Array.isArray(customConfig[key])) {
-              // Сливаем rule-providers по имени: существующие переопределяем частично,
-              // отсутствующие добавляем. Не затираем базовый набор (oisd_big, games-direct, ...).
+              // Сливаем rule-providers по имени
               if (!masterConfig['rule-providers'] || typeof masterConfig['rule-providers'] !== 'object') {
                 masterConfig['rule-providers'] = {};
               }

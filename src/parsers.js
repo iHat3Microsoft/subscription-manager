@@ -1117,15 +1117,4 @@ function parseSubscriptionUrl(line) {
   };
 }
 
-function uniqueServerName(name) {
-  const existing = new Set([
-    ...state.proxies.map(p => p.name),
-    ...state.proxyProviders.map(p => p.name)
-  ]);
-  if (!existing.has(name)) return name;
-  let i = 2;
-  while (existing.has(name + '-' + i)) i++;
-  return name + '-' + i;
-}
-
-module.exports = { parseVless, parseVmess, parseSS, parseTrojan, parseHysteria2, parseTuic, parseAmneziaWireGuardProxy, parseAmneziaAwgProxy, parseAmneziaVlessProxy, parseWireGuardConfig, parseProxyUrl };
+module.exports = { parseVless, parseVmess, parseSS, parseTrojan, parseHysteria2, parseTuic, parseAmneziaWireGuardProxy, parseAmneziaAwgProxy, parseAmneziaVlessProxy, parseWireGuardConfig, parseProxyUrl, parseSubscriptionUrl, parseAmneziaVpnJson };

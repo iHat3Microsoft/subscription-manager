@@ -1,15 +1,47 @@
 stages:
+  - test
   - deploy
 
-deploy:
+node-syntax:
+  stage: test
+  image: node:20-alpine
+  interruptible: true
+  script:
+    - node --check src/build.js
+    - node --check src/parsers.js
+    - node tests/test_parsers.js
+
+bash-syntax:
+  stage: test
+  image: bash:5
+  interruptible: true
+  script:
+    - for f in *.sh sync.bash ops/*.sh tests/*.sh; do echo "bash -n $f"; bash -n "$f"; done
+    - bash tests/test_shell_helpers.sh
+
+yaml-validate:
+  stage: test
+  image: node:20-alpine
+  interruptible: true
+  script:
+    - npm ci --omit=dev
+    - node -e "const fs=require('fs'),yaml=require('js-yaml');yaml.load(fs.readFileSync('my-rules.yaml','utf8'));console.log('my-rules.yaml: OK')"
+
+deploy:production:
   stage: deploy
   image: alpine:latest
+  needs: [node-syntax, bash-syntax, yaml-validate]
   only:
     - master
   before_script:
     - apk add --no-cache openssh-client rsync bash
     - eval $(ssh-agent -s)
-    - echo "$DEPLOY_SSH_KEY" | tr -d '\r' | ssh-add -
+    - |
+      if [ -n "${DEPLOY_SSH_KEY:-}" ] && [ -f "${DEPLOY_SSH_KEY:-}" ]; then ssh-add "$DEPLOY_SSH_KEY"
+      elif [ -n "${DEPLOY_SSH_KEY:-}" ]; then echo "$DEPLOY_SSH_KEY" | tr -d '\r' | ssh-add -
+      elif [ -n "${SSH_PRIVATE_KEY:-}" ] && [ -f "${SSH_PRIVATE_KEY:-}" ]; then ssh-add "$SSH_PRIVATE_KEY"
+      elif [ -n "${SSH_PRIVATE_KEY:-}" ]; then echo "$SSH_PRIVATE_KEY" | tr -d '\r' | ssh-add -
+      fi
     - mkdir -p ~/.ssh && chmod 700 ~/.ssh
     - ssh-keyscan -p "${DEPLOY_PORT:-22}" "$DEPLOY_HOST" >> ~/.ssh/known_hosts 2>/dev/null
   script:

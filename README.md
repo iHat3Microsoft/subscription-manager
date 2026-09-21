@@ -20,7 +20,7 @@
    Скопируйте папку `subscription-manager` на ваш сервер (например, в `/opt/mihomo-subscriptions/`).
    ```bash
    cd /opt/mihomo-subscriptions
-   npm install js-yaml
+   npm ci --omit=dev
    ```
 
 3. **Настройте домен (Caddy):**
@@ -53,13 +53,13 @@
 
    Скрипт сгенерирует криптографически безопасный токен (anti-bruteforce) для пользователя, сохранит его в `data/Vasya/token.txt`, и создаст файлы в папке `public/`:
    - Провайдеры: `public/providers/<TOKEN>_ru.yaml` и `public/providers/<TOKEN>_foreign.yaml`
-   - Основной конфиг для пользователя: `public/configs/<TOKEN>.yaml`
+   - Основной конфиг для пользователя: `public/configs/<TOKEN>` (без расширения)
 
    В консоли вы увидите готовую защищенную ссылку!
 
 3. **Использование в Mihomo (Clash Meta):**
    Отправьте пользователю защищенную ссылку из консоли. Например:
-   `https://sub.k3k.lol/configs/3f9b2d8e4c1a6f....yaml`
+   `https://sub.k3k.lol/configs/3f9b2d8e4c1a6f...`
    
    Пользователь вставляет эту ссылку в приложение. Приложение скачивает конфиг, который в свою очередь автоматически подтягивает `ru_servers` и `foreign_servers` из файлов провайдеров. Интервал обновления провайдеров установлен на 1 час (3600 сек).
 
@@ -73,10 +73,12 @@
    ```
 3. Клиентам придется обновить ссылку в приложении один раз. После этого автообновление будет работать через новый домен.
 
-## GitHub Actions автодеплой
+## Автодеплой через SSH (deploy-bot)
 
-В репозитории есть workflow: `.github/workflows/deploy.yml`.
-Он по `push` в `master` подключается по SSH и запускает серверный deploy через forced command.
+Деплой живёт на самом сервере как SSH forced command — workflow-файла в
+репозитории нет. GitLab CI в этой ветке закомментирован целиком
+(см. `.gitlab-ci.yml`): раскомментируешь, когда будешь готов добавлять
+секретные переменные.
 
 ### 1) Настройка безопасного deploy-пользователя на Ubuntu 24
 
@@ -86,11 +88,11 @@ sudo install -o root -g root -m 755 ops/subman-deploy.sh /usr/local/bin/subman-d
 sudo chown -R deploy-bot:deploy-bot /opt/subscription-manager
 ```
 
-Сгенерируйте SSH-ключ локально (для GitHub Actions), публичный ключ добавьте в
+Сгенерируйте SSH-ключ локально, публичный ключ добавьте в
 `/home/deploy-bot/.ssh/authorized_keys` с жесткими ограничениями:
 
 ```text
-command="/usr/local/bin/subman-deploy.sh",no-agent-forwarding,no-port-forwarding,no-pty,no-user-rc,no-X11-forwarding ssh-ed25519 AAAA... github-actions
+command="/usr/local/bin/subman-deploy.sh",no-agent-forwarding,no-port-forwarding,no-pty,no-user-rc,no-X11-forwarding ssh-ed25519 AAAA... deploy
 ```
 
 ```bash
@@ -102,17 +104,17 @@ sudo chown deploy-bot:deploy-bot /home/deploy-bot/.ssh/authorized_keys
 sudo chmod 600 /home/deploy-bot/.ssh/authorized_keys
 ```
 
-### 2) Secrets в GitHub
-
-Добавьте secrets:
-- `DEPLOY_HOST` (например `sub.k3k.lol`)
-- `DEPLOY_PORT` (обычно `22`)
-- `DEPLOY_USER` (`deploy-bot`)
-- `DEPLOY_SSH_KEY` (приватный ключ от пары выше)
-
-### 3) Что делает deploy
+### 2) Что делает деплой
 
 `/usr/local/bin/subman-deploy.sh`:
 - `git pull --ff-only origin master`
 - `npm ci --omit=dev`
 - `BASE_URL=https://sub.k3k.lol node src/build.js`
+
+Ручной запуск: `ssh deploy-bot@<host>` — forced command отработает
+независимо от переданной команды.
+
+Если деплой когда-нибудь переедет в GitLab CI, понадобятся переменные
+`SSH_PRIVATE_KEY`, `SSH_KNOWN_HOSTS`, `DEPLOY_HOST`, `DEPLOY_USER`,
+`DEPLOY_PORT`, `BASE_URL` (закомментированная джоба `deploy:production`
+в `.gitlab-ci.yml` уже их ждёт).
