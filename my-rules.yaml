@@ -82,7 +82,6 @@ payload:
 - DOMAIN-SUFFIX,tampermonkey.net # tampermonkey.net
 - DOMAIN-SUFFIX,ua # тест на ua ???
 - DOMAIN-SUFFIX,linktr.ee # linktr. аггрегатор ссылок на socials
-- GEOSITE,google-play # google-play
 - DOMAIN-SUFFIX,wallhaven.cc # обои на Android
 - DOMAIN-SUFFIX,alternativeto.net # поиск программ
 - DOMAIN-SUFFIX,worldcat.org # это крупнейший в мире сводный электронный каталог библиотек, объединяющий ресурсы более 72 000 библиотек из 170 стран. Он позволяет искать книги, музыкальные записи, фильмы, статьи и другие материалы (более 500 млн записей) в ближайших библиотеках, а также находить редкие издания.

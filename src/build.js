@@ -361,6 +361,14 @@ function generateConfig(userName, ruProviderUrl, foreignProviderUrl, excludePack
         use: ['foreign_servers']
       },
       {
+        name: '🔎 Google',
+        type: 'select',
+        hidden: true,
+        icon: 'https://cdn.jsdelivr.net/gh/Koolson/Qure@master/IconSet/Color/Google_Search.png',
+        proxies: ['DIRECT', '🌍 Иностранные серверы'],
+        use: ['foreign_servers']
+      },
+      {
         name: '💬 Discord',
         type: 'select',
         hidden: true,
@@ -562,6 +570,22 @@ function generateConfig(userName, ruProviderUrl, foreignProviderUrl, excludePack
         path: './rule-sets/telegram-ips.mrs',
         interval: 86400
       },
+      'geosite-google': {
+        behavior: 'domain',
+        type: 'http',
+        format: 'mrs',
+        url: 'https://github.com/MetaCubeX/meta-rules-dat/raw/meta/geo/geosite/google.mrs',
+        path: './rule-sets/google.mrs',
+        interval: 86400
+      },
+      'google-geoip': {
+        behavior: 'ipcidr',
+        type: 'http',
+        format: 'mrs',
+        url: 'https://github.com/MetaCubeX/meta-rules-dat/raw/meta/geo/geoip/google.mrs',
+        path: './rule-sets/google-geoip.mrs',
+        interval: 86400
+      },
       'geosite-openai': {
         behavior: 'domain',
         type: 'http',
@@ -696,6 +720,7 @@ function generateConfig(userName, ruProviderUrl, foreignProviderUrl, excludePack
       'RULE-SET,geosite-tiktok,🎵 TikTok',
       'RULE-SET,geosite-soundcloud,🌍 Иностранные серверы',
       'OR,((RULE-SET,geosite-openai),(RULE-SET,google-gemini),(RULE-SET,geosite-anthropic),(DOMAIN-KEYWORD,grok),(DOMAIN-SUFFIX,grok.com),(DOMAIN-SUFFIX,appcenter.ms),(DOMAIN-KEYWORD,copilot),(DOMAIN-SUFFIX,copilot.microsoft.com),(PROCESS-NAME-REGEX,(?i).*(chatgpt|claude|copilot|gemini|cursor|windsurf|cline|antigravity|opencode).*),(PROCESS-NAME,opencode),(PROCESS-NAME,com.openai.chatgpt),(PROCESS-NAME,com.anthropic.claude),(PROCESS-NAME,com.microsoft.copilot),(PROCESS-NAME,ai.perplexity.app.android)),🤖 AI (Нейронки)',
+      'OR,((RULE-SET,google-geoip),(RULE-SET,geosite-google)),🔎 Google',
       'RULE-SET,geosite-supercell,👾 Brawl Stars',
       'RULE-SET,ru-blocked,🚫 Заблокированные сайты (RU)',
       'RULE-SET,category-porn,🔞 18+',
