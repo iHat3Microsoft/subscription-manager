@@ -720,7 +720,6 @@ function generateConfig(userName, ruProviderUrl, foreignProviderUrl, excludePack
       'RULE-SET,geosite-tiktok,🎵 TikTok',
       'RULE-SET,geosite-soundcloud,🌍 Иностранные серверы',
       'OR,((RULE-SET,geosite-openai),(RULE-SET,google-gemini),(RULE-SET,geosite-anthropic),(DOMAIN-KEYWORD,grok),(DOMAIN-SUFFIX,grok.com),(DOMAIN-SUFFIX,appcenter.ms),(DOMAIN-KEYWORD,copilot),(DOMAIN-SUFFIX,copilot.microsoft.com),(PROCESS-NAME-REGEX,(?i).*(chatgpt|claude|copilot|gemini|cursor|windsurf|cline|antigravity|opencode).*),(PROCESS-NAME,opencode),(PROCESS-NAME,com.openai.chatgpt),(PROCESS-NAME,com.anthropic.claude),(PROCESS-NAME,com.microsoft.copilot),(PROCESS-NAME,ai.perplexity.app.android)),🤖 AI (Нейронки)',
-      'OR,((RULE-SET,google-geoip),(RULE-SET,geosite-google)),🔎 Google',
       'RULE-SET,geosite-supercell,👾 Brawl Stars',
       'RULE-SET,ru-blocked,🚫 Заблокированные сайты (RU)',
       'RULE-SET,category-porn,🔞 18+',
@@ -729,6 +728,7 @@ function generateConfig(userName, ruProviderUrl, foreignProviderUrl, excludePack
       'DOMAIN-SUFFIX,ru,DIRECT',
       'DOMAIN-SUFFIX,рф,DIRECT',
       'DOMAIN-SUFFIX,su,DIRECT',
+      'OR,((RULE-SET,google-geoip),(RULE-SET,geosite-google)),🔎 Google',
       'MATCH,🌐 Остальной трафик (MATCH)'
     ]
   };
