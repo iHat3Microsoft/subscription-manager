@@ -205,7 +205,7 @@ function asProxyList(result, baseName) {
 function generateConfig(userName, ruProviderUrl, foreignProviderUrl, excludePackages = []) {
   return {
     mode: 'rule',
-    ipv6: false,
+    ipv6: true,
     'log-level': 'info',
     'allow-lan': false,
     'unified-delay': true,
@@ -238,6 +238,7 @@ function generateConfig(userName, ruProviderUrl, foreignProviderUrl, excludePack
     tun: {
       enable: true,
       stack: 'mixed',
+      'inet6-address': 'fd00::1/128',
       'auto-route': true,
       'auto-detect-interface': true,
       'dns-hijack': ['any:53', 'tcp://any:53'],
