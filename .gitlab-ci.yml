@@ -38,6 +38,12 @@ deploy:production:
     - apk add --no-cache openssh-client rsync bash
     - eval $(ssh-agent -s)
     - |
+      if [ -z "${DEPLOY_HOST:-}" ]; then
+        echo "ERROR: DEPLOY_HOST is not set in GitLab CI/CD Variables!" >&2
+        echo "Go to Settings -> CI/CD -> Variables and set DEPLOY_HOST (IP or domain of server)" >&2
+        exit 1
+      fi
+    - |
       if [ -n "${DEPLOY_SSH_KEY:-}" ] && [ -f "${DEPLOY_SSH_KEY:-}" ]; then
         chmod 600 "$DEPLOY_SSH_KEY"
         ssh-add "$DEPLOY_SSH_KEY"
@@ -48,10 +54,14 @@ deploy:production:
         ssh-add "$SSH_PRIVATE_KEY"
       elif [ -n "${SSH_PRIVATE_KEY:-}" ]; then
         echo "$SSH_PRIVATE_KEY" | tr -d '\r' | ssh-add -
+      else
+        echo "ERROR: DEPLOY_SSH_KEY is not set in GitLab CI/CD Variables!" >&2
+        exit 1
       fi
+    - ssh-add -l
     - mkdir -p ~/.ssh && chmod 700 ~/.ssh
-    - ssh-keyscan -p "${DEPLOY_PORT:-22}" "$DEPLOY_HOST" >> ~/.ssh/known_hosts 2>/dev/null
-    - chmod 644 ~/.ssh/known_hosts
+    - ssh-keyscan -p "${DEPLOY_PORT:-22}" "$DEPLOY_HOST" >> ~/.ssh/known_hosts 2>/dev/null || true
+    - chmod 644 ~/.ssh/known_hosts 2>/dev/null || true
   script:
-    - rsync -avz -e "ssh -p ${DEPLOY_PORT:-22}" src/build.js src/parsers.js "${DEPLOY_USER:-deploy-bot}@${DEPLOY_HOST}:${DEPLOY_PATH:-/opt/subscription-manager}/src/"
-    - ssh -p "${DEPLOY_PORT:-22}" "${DEPLOY_USER:-deploy-bot}@${DEPLOY_HOST}" "node src/build.js"
+    - rsync -avz -e "ssh -p ${DEPLOY_PORT:-22} -o StrictHostKeyChecking=accept-new" src/build.js src/parsers.js "${DEPLOY_USER:-deploy-bot}@${DEPLOY_HOST}:${DEPLOY_PATH:-/opt/subscription-manager}/src/"
+    - ssh -p "${DEPLOY_PORT:-22}" -o StrictHostKeyChecking=accept-new "${DEPLOY_USER:-deploy-bot}@${DEPLOY_HOST}" "node src/build.js"
