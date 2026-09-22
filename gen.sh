@@ -237,6 +237,29 @@ SERVER_PUBLIC_KEY="$(
 )"
 
 if ! valid_wg_key "$SERVER_PUBLIC_KEY"; then
+    echo "[*] Server public key file not found or invalid, deriving from server PrivateKey..."
+    SERVER_PRIVATE_KEY="$(
+        awk -F'= *' '
+            BEGIN { IGNORECASE=1 }
+            /^\[Interface\]/ { in_iface=1; next }
+            /^\[/ && in_iface { exit }
+            in_iface && /^[[:space:]]*PrivateKey[[:space:]]*=/ {
+                print $2
+                exit
+            }
+        ' "$SERVER_CONF_LOCAL" | tr -d ' \r\n'
+    )"
+
+    if valid_wg_key "$SERVER_PRIVATE_KEY"; then
+        SERVER_PUBLIC_KEY="$(
+            printf '%s\n' "$SERVER_PRIVATE_KEY" \
+            | ssh_remote "sudo docker exec -i $REMOTE_CONTAINER awg pubkey 2>/dev/null || true" \
+            | tr -d ' \r\n'
+        )"
+    fi
+fi
+
+if ! valid_wg_key "$SERVER_PUBLIC_KEY"; then
     echo "[!] Server public key from $SERVER_PUB_FILE looks invalid:"
     echo "    '$SERVER_PUBLIC_KEY'"
     echo
@@ -285,6 +308,7 @@ fi
 
 AWG_EXTRA="$(
     awk '
+        BEGIN { IGNORECASE=1 }
         /^\[Interface\]/ {
             in_iface=1
             next
@@ -294,7 +318,7 @@ AWG_EXTRA="$(
             exit
         }
 
-        in_iface && /^[[:space:]]*#?[[:space:]]*(Jc|Jmin|Jmax|S[1-4]|H[1-4]|I[1-5])[[:space:]]*=/ {
+        in_iface && /^[[:space:]]*#?[[:space:]]*(Jc|Jmin|Jmax|S[1-4]|H[1-4]|I[1-5]|J[1-3]|Itime|HeaderProtectionKey|ContentPaddingAddition|RekeyAfterTime|RekeyTimeout|RejectAfterTime|KeepaliveTimeout|MaxHandshakeAttempts|RandomTrailers|DisableCookies)[[:space:]]*=/ {
             print
         }
     ' "$SERVER_CONF_LOCAL" \
@@ -303,7 +327,7 @@ AWG_EXTRA="$(
 )"
 
 if [[ -z "$AWG_EXTRA" ]]; then
-    echo "[!] Could not extract AmneziaWG params: Jc/Jmin/Jmax/S1-S4/H1-H4/I1-I5"
+    echo "[!] Could not extract AmneziaWG obfuscation parameters (Jc/S1-S4/H1-H4/I1-I5/HeaderProtectionKey/etc.) from $AWG_CONF"
     exit 1
 fi
 
