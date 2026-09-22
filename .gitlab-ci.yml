@@ -42,6 +42,5 @@ deploy:production:
     - ssh-keyscan -p "${DEPLOY_PORT:-22}" "$DEPLOY_HOST" >> ~/.ssh/known_hosts 2>/dev/null || true
     - chmod 644 ~/.ssh/known_hosts 2>/dev/null || true
 
-    # 3. Синхронизация и сборка
+    # 3. Синхронизация файлов в src/ (без выполнения сборщика от имени deploy-bot)
     - rsync -avz -e "ssh -p ${DEPLOY_PORT:-22} -o StrictHostKeyChecking=accept-new" src/build.js src/parsers.js "${DEPLOY_USER:-deploy-bot}@${DEPLOY_HOST}:${DEPLOY_PATH:-/opt/subscription-manager}/src/"
-    - ssh -p "${DEPLOY_PORT:-22}" -o StrictHostKeyChecking=accept-new "${DEPLOY_USER:-deploy-bot}@${DEPLOY_HOST}" "node src/build.js"
