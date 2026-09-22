@@ -845,11 +845,8 @@ function collectAwgOptions(getOrObj, rawVersion = '') {
 
 function setWireGuardDns(proxy, dns) {
   if (!dns) return;
-  const dnsList = String(dns).split(',').map(d => d.trim()).filter(Boolean);
-  const validDns = dnsList.filter(d => !/^172\.(1[6-9]|2[0-9]|3[0-1])\./.test(d));
-  if (validDns.length > 0) {
-    proxy.dns = validDns;
-  }
+  proxy.dns = [String(dns).split(',')[0].trim()];
+  proxy['remote-dns-resolve'] = true;
 }
 
 function parseIniSection(text, sectionName) {
@@ -1121,7 +1118,7 @@ function parseWireGuardConfig(text) {
   const pka = toIntMaybe(peerGet('PersistentKeepalive'));
   if (pka !== null && pka > 0) proxy['persistent-keepalive'] = pka;
   const dns = ifaceGet('DNS');
-  if (dns) setWireGuardDns(proxy, dns);
+  if (dns) setWireGuardDns(proxy, dns.split(',')[0].trim());
   if (isAmnezia) {
     const { awg, version } = collectAwgOptions(ifaceGet, '');
     proxy.awgVersion = version;
