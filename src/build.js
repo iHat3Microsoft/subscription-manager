@@ -208,7 +208,6 @@ function buildTun(excludePackages) {
   return {
     enable: true,
     stack: 'mixed',
-    'inet6-address': 'fd00::1/128',
     'auto-route': true,
     'auto-detect-interface': true,
     'dns-hijack': ['any:53', 'tcp://any:53'],
