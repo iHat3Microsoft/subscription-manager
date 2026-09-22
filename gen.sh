@@ -384,7 +384,7 @@ if [[ -z "$DNS_VALUE" ]]; then
 fi
 
 if [[ -z "$DNS_VALUE" ]]; then
-    DNS_VALUE="1.1.1.1, 8.8.8.8"
+    DNS_VALUE="172.29.172.254, 1.0.0.1"
 fi
 
 if [[ -n "$ENDPOINT_OVERRIDE" ]]; then

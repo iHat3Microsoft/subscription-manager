@@ -6,6 +6,10 @@ deploy:production:
   image: node:20-alpine
   rules:
     - if: '$CI_COMMIT_BRANCH == "master"'
+      changes:
+        - src/**/*
+        - package.json
+        - .gitlab-ci.yml
   before_script:
     - apk add --no-cache openssh-client rsync bash
   script:
