@@ -300,6 +300,41 @@ function buildProxyGroups() {
       use: ['foreign_servers']
     },
     {
+      name: '🌐 Остальной трафик (MATCH)',
+      type: 'select',
+      icon: 'https://cdn.jsdelivr.net/gh/Koolson/Qure@master/IconSet/Color/Auto.png',
+      proxies: ['DIRECT', '🌍 Иностранные серверы'],
+      use: ['foreign_servers']
+    },
+    {
+      name: '▶️ YouTube',
+      type: 'select',
+      icon: 'https://cdn.jsdelivr.net/gh/Koolson/Qure@master/IconSet/Color/YouTube.png',
+      proxies: ['♻️ Резерв (RU -> EU)', '🌍 Иностранные серверы', 'DIRECT'],
+      use: ['ru_servers', 'foreign_servers']
+    },
+    {
+      name: '🔎 Google',
+      type: 'select',
+      icon: 'https://cdn.jsdelivr.net/gh/Koolson/Qure@master/IconSet/Color/Google_Search.png',
+      proxies: ['DIRECT', '🌍 Иностранные серверы'],
+      use: ['foreign_servers']
+    },
+    {
+      name: '🚫 Реклама',
+      type: 'select',
+      icon: 'https://raw.githubusercontent.com/remnawave/templates/refs/heads/main/icons/AdBlock.png',
+      proxies: ['REJECT', 'DIRECT', '🌍 Иностранные серверы'],
+      use: ['foreign_servers']
+    },
+    {
+      name: '💬 Discord',
+      type: 'select',
+      icon: 'https://raw.githubusercontent.com/remnawave/templates/refs/heads/main/icons/Discord.png',
+      proxies: ['♻️ Резерв (RU -> EU)', '🌍 Иностранные серверы', 'DIRECT'],
+      use: ['ru_servers', 'foreign_servers']
+    },
+    {
       name: '🚫 Заблокированные сайты (RU)',
       type: 'select',
       hidden: true,
@@ -316,50 +351,12 @@ function buildProxyGroups() {
       use: ['foreign_servers']
     },
     {
-      name: '🚫 Реклама',
-      type: 'select',
-      icon: 'https://raw.githubusercontent.com/remnawave/templates/refs/heads/main/icons/AdBlock.png',
-      proxies: ['REJECT', 'DIRECT', '🌍 Иностранные серверы'],
-      use: ['foreign_servers']
-    },
-    {
-      name: '🌐 Остальной трафик (MATCH)',
-      type: 'select',
-      icon: 'https://cdn.jsdelivr.net/gh/Koolson/Qure@master/IconSet/Color/Auto.png',
-      proxies: ['DIRECT', '🌍 Иностранные серверы'],
-      use: ['foreign_servers']
-    },
-    {
-      name: '🔎 Google',
-      type: 'select',
-      hidden: true,
-      icon: 'https://cdn.jsdelivr.net/gh/Koolson/Qure@master/IconSet/Color/Google_Search.png',
-      proxies: ['DIRECT', '🌍 Иностранные серверы'],
-      use: ['foreign_servers']
-    },
-    {
-      name: '💬 Discord',
-      type: 'select',
-      hidden: true,
-      icon: 'https://raw.githubusercontent.com/remnawave/templates/refs/heads/main/icons/Discord.png',
-      proxies: ['♻️ Резерв (RU -> EU)', '🌍 Иностранные серверы', 'DIRECT'],
-      use: ['ru_servers', 'foreign_servers']
-    },
-    {
       name: '📞 WhatsApp',
       type: 'select',
       hidden: true,
       icon: 'https://cdn.jsdelivr.net/gh/Koolson/Qure@master/IconSet/Color/WhatsApp.png',
       proxies: ['🌍 Иностранные серверы', 'DIRECT'],
       use: ['foreign_servers']
-    },
-    {
-      name: '▶️ YouTube',
-      type: 'select',
-      hidden: true,
-      icon: 'https://cdn.jsdelivr.net/gh/Koolson/Qure@master/IconSet/Color/YouTube.png',
-      proxies: ['♻️ Резерв (RU -> EU)', '🌍 Иностранные серверы', 'DIRECT'],
-      use: ['ru_servers', 'foreign_servers']
     },
     {
       name: '📸 Instagram & Threads',
