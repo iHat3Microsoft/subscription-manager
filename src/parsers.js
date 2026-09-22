@@ -571,12 +571,15 @@ function parseHysteria2(rawUrl) {
   const password = decodeURIComponentSafe(u.username);
   if (password) proxy.password = password;
   if (p.get('sni')) proxy.sni = p.get('sni');
-  if (parseBoolish(p.get('insecure'))) proxy['skip-cert-verify'] = true;
-  const obfs = p.get('obfs');
+  if (parseBoolish(p.get('insecure')) || parseBoolish(p.get('allowInsecure'))) proxy['skip-cert-verify'] = true;
+  const obfs = p.get('obfs') || p.get('obfs-type') || p.get('obfs_type');
   if (obfs && obfs !== 'none') {
     proxy.obfs = obfs;
-    if (p.get('obfs-password')) proxy['obfs-password'] = p.get('obfs-password');
+    const obfsPass = p.get('obfs-password') || p.get('obfs_password');
+    if (obfsPass) proxy['obfs-password'] = obfsPass;
   }
+  const ports = p.get('ports') || p.get('mport');
+  if (ports) proxy.ports = ports;
   const alpn = parseCsv(p.get('alpn'));
   if (alpn.length) proxy.alpn = alpn;
   if (p.get('pinSHA256')) proxy.fingerprint = p.get('pinSHA256');
