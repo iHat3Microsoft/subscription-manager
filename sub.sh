@@ -10,6 +10,7 @@ DRY_RUN=0
 SKIP_BUILD=0
 REUSE_LOCAL=0
 FORCE=0
+CATEGORY="foreign"
 REMOTE_FILENAME=""
 
 usage() {
@@ -20,12 +21,15 @@ Usage:
 Example:
   $0 finland
   $0 --name 'Финляндия.txt' finland
+  $0 --ru --name 'Москва.txt' moscow
   $0 --dry-run --name 'Финляндия.txt' finland
 
 Options:
   --nether HOST        Subscription-manager SSH alias, default: nether2
   --data-dir PATH      Remote data dir, default: /opt/subscription-manager/data
-  --name FILENAME      Filename inside every foreign/ dir, example: Финляндия.txt
+  --name FILENAME      Filename inside target dir, example: Финляндия.txt or Москва.txt
+  --ru                 Upload to ru/ instead of foreign/
+  --category DIR       Target directory inside user folder (foreign or ru), default: foreign
   --gen-script PATH    Local generator script, default: ./gen.sh
   --build-cmd CMD      Remote build command, default: buildvpn
   --skip-build         Do not run buildvpn after upload
@@ -44,6 +48,14 @@ while [[ $# -gt 0 ]]; do
             ;;
         --data-dir)
             DATA_DIR="${2:?missing data dir}"
+            shift 2
+            ;;
+        --ru)
+            CATEGORY="ru"
+            shift
+            ;;
+        --category|--dir)
+            CATEGORY="${2:?missing category (foreign or ru)}"
             shift 2
             ;;
         --name)
@@ -107,7 +119,8 @@ if [[ ! -f "$GEN_SCRIPT" ]]; then
 fi
 
 if [[ -z "$REMOTE_FILENAME" ]]; then
-    read -rp "Filename inside every foreign/ folder, example Финляндия.txt: " REMOTE_FILENAME
+    example_name=$([[ "$CATEGORY" == "ru" ]] && echo "Москва.txt" || echo "Финляндия.txt")
+    read -rp "Filename inside every ${CATEGORY}/ folder, example ${example_name}: " REMOTE_FILENAME
 fi
 
 if [[ -z "$REMOTE_FILENAME" ]]; then
@@ -136,7 +149,8 @@ ssh_nether() {
 echo "[*] VPN server: $VPN_SERVER"
 echo "[*] Subscription host: $NETHER_HOST"
 echo "[*] Data dir: $DATA_DIR"
-echo "[*] Foreign filename: $REMOTE_FILENAME"
+echo "[*] Category: $CATEGORY"
+echo "[*] Target filename: $REMOTE_FILENAME"
 echo
 
 echo "[*] Reading users from $NETHER_HOST..."
@@ -168,7 +182,7 @@ NEEDED_USERS=()
 SKIPPED_USERS=()
 
 for u in "${USERS[@]}"; do
-    dst="$DATA_DIR/$u/foreign/$REMOTE_FILENAME"
+    dst="$DATA_DIR/$u/$CATEGORY/$REMOTE_FILENAME"
 
     if ssh_nether "test -e $(sq "$dst")"; then
         if [[ "$FORCE" -eq 1 ]]; then
@@ -240,7 +254,7 @@ if [[ "$DRY_RUN" -eq 1 ]]; then
     echo
     echo "[DRY-RUN] Would upload:"
     for u in "${USERS[@]}"; do
-        echo "    $LOCAL_OUT_DIR/$u.conf -> $NETHER_HOST:$DATA_DIR/$u/foreign/$REMOTE_FILENAME"
+        echo "    $LOCAL_OUT_DIR/$u.conf -> $NETHER_HOST:$DATA_DIR/$u/$CATEGORY/$REMOTE_FILENAME"
     done
     echo
     if [[ "$SKIP_BUILD" -eq 0 ]]; then
@@ -273,7 +287,7 @@ echo "[*] Uploading configs to $NETHER_HOST..."
 
 for u in "${USERS[@]}"; do
     conf="$LOCAL_OUT_DIR/$u.conf"
-    remote_dir="$DATA_DIR/$u/foreign"
+    remote_dir="$DATA_DIR/$u/$CATEGORY"
     remote_dst="$remote_dir/$REMOTE_FILENAME"
     remote_tmp="$remote_dir/.$REMOTE_FILENAME.tmp.$$"
 
