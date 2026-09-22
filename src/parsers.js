@@ -1121,7 +1121,7 @@ function parseWireGuardConfig(text) {
   const pka = toIntMaybe(peerGet('PersistentKeepalive'));
   if (pka !== null && pka > 0) proxy['persistent-keepalive'] = pka;
   const dns = ifaceGet('DNS');
-  if (dns) setWireGuardDns(proxy, dns.split(',')[0].trim());
+  if (dns) setWireGuardDns(proxy, dns);
   if (isAmnezia) {
     const { awg, version } = collectAwgOptions(ifaceGet, '');
     proxy.awgVersion = version;
