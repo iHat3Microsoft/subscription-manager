@@ -25,7 +25,8 @@ yaml-validate:
   interruptible: true
   script:
     - npm ci --omit=dev
-    - node -e "const fs=require('fs'),yaml=require('js-yaml');yaml.load(fs.readFileSync('my-rules.yaml','utf8'));console.log('my-rules.yaml: OK')"
+    - >-
+      node -e "const fs=require('fs'),yaml=require('js-yaml');yaml.load(fs.readFileSync('my-rules.yaml','utf8'));console.log('my-rules.yaml OK')"
 
 deploy:production:
   stage: deploy
