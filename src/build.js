@@ -264,9 +264,9 @@ function buildProxyGroups() {
       hidden: true,
       lazy: true,
       url: 'https://www.gstatic.com/generate_204',
-      interval: 300,
+      interval: 120,
       timeout: 5000,
-      'max-failed-times': 5,
+      'max-failed-times': 3,
       use: ['foreign_servers']
     },
     {
@@ -275,9 +275,9 @@ function buildProxyGroups() {
       hidden: true,
       lazy: true,
       url: 'https://www.gstatic.com/generate_204',
-      interval: 300,
+      interval: 120,
       timeout: 5000,
-      'max-failed-times': 5,
+      'max-failed-times': 3,
       use: ['ru_servers']
     },
     {
@@ -286,9 +286,9 @@ function buildProxyGroups() {
       hidden: true,
       lazy: true,
       url: 'https://www.gstatic.com/generate_204',
-      interval: 300,
+      interval: 120,
       timeout: 5000,
-      'max-failed-times': 5,
+      'max-failed-times': 3,
       use: ['ru_servers', 'foreign_servers']
     },
     {
