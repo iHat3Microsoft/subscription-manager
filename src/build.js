@@ -800,15 +800,21 @@ async function buildAll() {
     let ruProxies = await collectProxiesFromDir(ruDir);
     let foreignProxies = await collectProxiesFromDir(foreignDir);
 
-    // RU-серверы: отключаем remote-dns-resolve и убираем 172.x DNS,
-    // чтобы ноды РФ не зависали на заблокированном UDP 53 / недоступном Amnezia DNS.
-    ruProxies = ruProxies.map(p => {
+    // Отключаем remote-dns-resolve и убираем 172.x DNS для всех Wireguard нод (RU и foreign),
+    // чтобы туннели не зависали на недоступных докер-DNS и использовали централизованный DNS Mihomo.
+    const sanitizeWireGuard = p => {
       if (p && p.type === 'wireguard') {
         delete p['remote-dns-resolve'];
-        delete p.dns;
+        if (p.dns && Array.isArray(p.dns)) {
+          p.dns = p.dns.filter(d => !/^172\.(1[6-9]|2[0-9]|3[0-1])\./.test(d));
+          if (p.dns.length === 0) delete p.dns;
+        }
       }
       return p;
-    });
+    };
+
+    ruProxies = ruProxies.map(sanitizeWireGuard);
+    foreignProxies = foreignProxies.map(sanitizeWireGuard);
 
     const sortProxies = (a, b) => {
       const a10g = a.name.includes('10гбит') || a.name.includes('10G') || a.name.includes('10gbit');

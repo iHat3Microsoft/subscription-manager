@@ -845,10 +845,11 @@ function collectAwgOptions(getOrObj, rawVersion = '') {
 
 function setWireGuardDns(proxy, dns) {
   if (!dns) return;
-  const firstDns = String(dns).split(',')[0].trim();
-  if (!firstDns) return;
-  proxy.dns = [firstDns];
-  proxy['remote-dns-resolve'] = true;
+  const dnsList = String(dns).split(',').map(d => d.trim()).filter(Boolean);
+  const validDns = dnsList.filter(d => !/^172\.(1[6-9]|2[0-9]|3[0-1])\./.test(d));
+  if (validDns.length > 0) {
+    proxy.dns = validDns;
+  }
 }
 
 function parseIniSection(text, sectionName) {
