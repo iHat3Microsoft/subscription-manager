@@ -845,10 +845,22 @@ function collectAwgOptions(getOrObj, rawVersion = '') {
 
 function setWireGuardDns(proxy, dns) {
   if (!dns) return;
-  const firstDns = String(dns).split(',')[0].trim();
-  // Filter out internal docker private IPs like 172.29.172.254 which do not resolve outside Amnezia
-  if (!firstDns || /^172\.(1[6-9]|2[0-9]|3[0-1])\./.test(firstDns)) return;
-  proxy.dns = [firstDns];
+  const dnsList = String(dns).split(',').map(d => d.trim()).filter(Boolean);
+  const validDns = [];
+  for (const d of dnsList) {
+    if (d) validDns.push(d);
+  }
+  // If internal 172.x docker DNS is present, append public DNS fallbacks
+  // so if the server lacks an Amnezia DNS container (e.g. RU servers),
+  // resolution resolves through the VPN tunnel via public DNS instead of timing out.
+  if (validDns.some(d => /^172\.(1[6-9]|2[0-9]|3[0-1])\./.test(d))) {
+    if (!validDns.includes('1.1.1.1')) validDns.push('1.1.1.1');
+    if (!validDns.includes('8.8.8.8')) validDns.push('8.8.8.8');
+  }
+  if (validDns.length > 0) {
+    proxy.dns = validDns;
+    proxy['remote-dns-resolve'] = true;
+  }
 }
 
 function parseIniSection(text, sectionName) {

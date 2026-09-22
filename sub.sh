@@ -142,8 +142,22 @@ sq() {
     printf "'"
 }
 
+SSH_TMP_DIR=$(mktemp -d "/tmp/sub_awg_ssh.XXXXXX")
+trap 'ssh -O exit -o ControlPath="$SSH_TMP_DIR/master.sock" "$NETHER_HOST" 2>/dev/null || true; rm -rf "$SSH_TMP_DIR"' EXIT
+
+SSH_OPTS=(
+    -o "ControlMaster=auto"
+    -o "ControlPath=$SSH_TMP_DIR/master.sock"
+    -o "ControlPersist=5m"
+    -o "BatchMode=yes"
+    -o "ConnectTimeout=15"
+    -o "ServerAliveInterval=15"
+    -o "ServerAliveCountMax=3"
+    -o "StrictHostKeyChecking=accept-new"
+)
+
 ssh_nether() {
-    ssh "$NETHER_HOST" "$@"
+    ssh "${SSH_OPTS[@]}" "$NETHER_HOST" "$@"
 }
 
 echo "[*] VPN server: $VPN_SERVER"
