@@ -30,6 +30,7 @@ REMOTE_FILENAME="${REMOTE_FILENAME:-}"
 DRY_RUN=0
 SKIP_BUILD=0   # default: run buildvpn (run --skip-build to override)
 NO_CACHE=0      # by default: skip users whose local <u>.vless already exists
+FORCE=0         # default: skip users who already have remote file
 MODE="url"      # default: save subscription_url instead of vless keys
 
 PANEL=""
@@ -81,6 +82,7 @@ Options:
                         local ./out_keys/<u>.vless; even if the cached
                         file is from a different panel, re-fetch from the
                         current one)
+  --force               Overwrite existing remote files instead of skipping them
   --skip-build          Do not run buildvpn after upload
   --build               Run buildvpn after upload (now default)
   -h, --help            Show this help
@@ -117,6 +119,8 @@ while [[ $# -gt 0 ]]; do
             PASSWORD_ENV_NAME="${2:?missing}"; shift 2 ;;
         --dry-run)
             DRY_RUN=1; shift ;;
+        --force)
+            FORCE=1; shift ;;
         --skip-build)
             SKIP_BUILD=1; shift ;;
         --build)
@@ -221,7 +225,40 @@ for u in "${USERS[@]}"; do
     TO_FETCH+=("$u")
 done
 
-# 3) Authenticate with Marzban
+# 3) Pre-flight: filter out users that already have the file (unless --force)
+echo "[*] Pre-flight: checking remote target files..."
+NEEDED_FETCH=()
+SKIPPED_FETCH=()
+
+for u in "${TO_FETCH[@]}"; do
+    if ssh_cmd "test -e $(sq "$DATA_DIR/$u/foreign/$REMOTE_FILENAME")" 2>/dev/null; then
+        if [[ "$FORCE" -eq 1 ]]; then
+            NEEDED_FETCH+=("$u")
+        else
+            SKIPPED_FETCH+=("$u")
+        fi
+    else
+        NEEDED_FETCH+=("$u")
+    fi
+done
+
+if [[ "${#SKIPPED_FETCH[@]}" -gt 0 ]]; then
+    echo "[*] Already provisioned (${#SKIPPED_FETCH[@]} user(s), skipping):"
+    printf '    %s\n' "${SKIPPED_FETCH[@]}"
+    echo
+fi
+
+if [[ "${#NEEDED_FETCH[@]}" -eq 0 ]]; then
+    echo "[+] All users already have $REMOTE_FILENAME. Nothing to generate."
+    exit 0
+fi
+
+TO_FETCH=("${NEEDED_FETCH[@]}")
+echo "[*] Target users to generate and upload (${#TO_FETCH[@]} user(s)):"
+printf '    %s\n' "${TO_FETCH[@]}"
+echo
+
+# 4) Authenticate with Marzban
 if [[ "$DRY_RUN" -eq 0 ]]; then
     ADMIN_PASS=""
     if [[ -n "${!PASSWORD_ENV_NAME:-}" ]]; then
@@ -249,20 +286,6 @@ if [[ "$DRY_RUN" -eq 0 ]]; then
         printf '    %s\n' "$TOKEN_RESP" | head >&2
         exit 1
     fi
-fi
-
-# 4) Pre-flight: refuse to overwrite remote files
-echo "[*] Pre-flight: refusing to overwrite remote files"
-EXISTING_REMOTE=()
-for u in "${USERS[@]}"; do
-    if ssh_cmd "test -e $(sq "$DATA_DIR/$u/foreign/$REMOTE_FILENAME")" 2>/dev/null; then
-        EXISTING_REMOTE+=("$DATA_DIR/$u/foreign/$REMOTE_FILENAME")
-    fi
-done
-if [[ "${#EXISTING_REMOTE[@]}" -gt 0 ]]; then
-    echo "[!] Abort: remote files already exist:" >&2
-    printf '    %s\n' "${EXISTING_REMOTE[@]}" >&2
-    exit 1
 fi
 
 # 5) Prepare local out dir

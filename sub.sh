@@ -9,6 +9,7 @@ BUILD_CMD="${BUILD_CMD:-buildvpn}"
 DRY_RUN=0
 SKIP_BUILD=0
 REUSE_LOCAL=0
+FORCE=0
 REMOTE_FILENAME=""
 
 usage() {
@@ -29,6 +30,7 @@ Options:
   --build-cmd CMD      Remote build command, default: buildvpn
   --skip-build         Do not run buildvpn after upload
   --reuse-local        Skip gen.sh, reuse already-generated ./out_keys/<server>/*.conf
+  --force              Overwrite existing remote files instead of skipping them
   --dry-run            Only show what would be done
   -h, --help           Show help
 EOF
@@ -62,6 +64,10 @@ while [[ $# -gt 0 ]]; do
             ;;
         --reuse-local)
             REUSE_LOCAL=1
+            shift
+            ;;
+        --force)
+            FORCE=1
             shift
             ;;
         --dry-run)
@@ -158,21 +164,38 @@ done
 
 echo "[*] Preflight: checking remote target files..."
 
-EXISTING_REMOTE=()
+NEEDED_USERS=()
+SKIPPED_USERS=()
 
 for u in "${USERS[@]}"; do
     dst="$DATA_DIR/$u/foreign/$REMOTE_FILENAME"
 
     if ssh_nether "test -e $(sq "$dst")"; then
-        EXISTING_REMOTE+=("$dst")
+        if [[ "$FORCE" -eq 1 ]]; then
+            NEEDED_USERS+=("$u")
+        else
+            SKIPPED_USERS+=("$u")
+        fi
+    else
+        NEEDED_USERS+=("$u")
     fi
 done
 
-if [[ "${#EXISTING_REMOTE[@]}" -gt 0 ]]; then
-    echo "[!] Abort: these remote files already exist, refusing to overwrite:"
-    printf '    %s\n' "${EXISTING_REMOTE[@]}"
-    exit 1
+if [[ "${#SKIPPED_USERS[@]}" -gt 0 ]]; then
+    echo "[*] Already provisioned (${#SKIPPED_USERS[@]} user(s), skipping):"
+    printf '    %s\n' "${SKIPPED_USERS[@]}"
+    echo
 fi
+
+if [[ "${#NEEDED_USERS[@]}" -eq 0 ]]; then
+    echo "[+] All users already have $REMOTE_FILENAME. Nothing to generate."
+    exit 0
+fi
+
+USERS=("${NEEDED_USERS[@]}")
+echo "[*] Target users to generate and upload (${#USERS[@]} user(s)):"
+printf '    %s\n' "${USERS[@]}"
+echo
 
 LOCAL_OUT_DIR="./out_keys/$VPN_SERVER"
 
@@ -197,11 +220,8 @@ else
     done
 
     if [[ "${#EXISTING_LOCAL[@]}" -gt 0 ]]; then
-        echo "[!] Abort: local generated files already exist, refusing to continue:"
-        printf '    %s\n' "${EXISTING_LOCAL[@]}"
-        echo
-        echo "    Move/remove old files or use a clean output directory for gen.sh."
-        exit 1
+        echo "[*] Removing stale local generated files for target users..."
+        rm -f "${EXISTING_LOCAL[@]}"
     fi
 fi
 

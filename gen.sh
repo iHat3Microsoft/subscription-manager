@@ -16,6 +16,8 @@ USE_SSHPASS=0
 ENDPOINT_OVERRIDE=""
 ENDPOINT_HOST_OVERRIDE=""
 DNS_OVERRIDE=""
+FORCE=0
+SKIP_EXISTING=0
 
 usage() {
     cat <<EOF
@@ -38,6 +40,8 @@ Options:
   --endpoint HOST:PORT      Override final Endpoint
   --endpoint-host HOST      Override endpoint host, port is taken from awg0.conf
   --dns "A, B"              Override DNS in generated client configs
+  --skip-existing           Skip users whose local output already exists
+  --force                   Overwrite existing local output files
   -h, --help                Show this help
 EOF
 }
@@ -75,6 +79,14 @@ while [[ $# -gt 0 ]]; do
         --dns)
             DNS_OVERRIDE="${2:?missing dns value}"
             shift 2
+            ;;
+        --skip-existing)
+            SKIP_EXISTING=1
+            shift
+            ;;
+        --force)
+            FORCE=1
+            shift
             ;;
         -h|--help)
             usage
@@ -484,11 +496,19 @@ for USERNAME in "${USERS[@]}"; do
     CLIENT_INFO="$OUT_DIR/$TARGET/${USERNAME}.info"
 
     if [[ -e "$CLIENT_CONF" || -e "$CLIENT_INFO" ]]; then
-        echo "[!] Output already exists for $USERNAME:"
-        echo "    $CLIENT_CONF"
-        echo "    $CLIENT_INFO"
-        echo "    Remove old files or choose another username."
-        exit 1
+        if [[ "$FORCE" -eq 1 ]]; then
+            echo "[*] Overwriting existing files for $USERNAME (--force)"
+            rm -f "$CLIENT_CONF" "$CLIENT_INFO"
+        elif [[ "$SKIP_EXISTING" -eq 1 ]]; then
+            echo "[*] Skipping existing output for $USERNAME"
+            continue
+        else
+            echo "[!] Output already exists for $USERNAME:"
+            echo "    $CLIENT_CONF"
+            echo "    $CLIENT_INFO"
+            echo "    Use --force to overwrite or --skip-existing to skip."
+            exit 1
+        fi
     fi
 
     echo "[*] Generating $USERNAME -> $CLIENT_ADDR"
