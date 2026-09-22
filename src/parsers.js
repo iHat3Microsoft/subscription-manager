@@ -845,18 +845,54 @@ function collectAwgOptions(getOrObj, rawVersion = '') {
 
 function setWireGuardDns(proxy, dns) {
   if (!dns) return;
-  proxy.dns = [dns];
-  proxy['remote-dns-resolve'] = true;
+  const firstDns = String(dns).split(',')[0].trim();
+  // Filter out internal docker private IPs like 172.29.172.254 which do not resolve outside Amnezia
+  if (!firstDns || /^172\.(1[6-9]|2[0-9]|3[0-1])\./.test(firstDns)) return;
+  proxy.dns = [firstDns];
+}
+
+function parseIniSection(text, sectionName) {
+  if (!text || typeof text !== 'string') return {};
+  const lines = text.split(/\r?\n/);
+  const result = {};
+  let inSection = false;
+  for (let line of lines) {
+    line = line.trim();
+    if (!line || line.startsWith('#')) continue;
+    if (line.startsWith('[') && line.endsWith(']')) {
+      inSection = (line.slice(1, -1).trim().toLowerCase() === sectionName.toLowerCase());
+      continue;
+    }
+    if (inSection) {
+      const kv = line.match(/^(\w+)\s*=\s*(.+)$/);
+      if (kv) result[kv[1].trim()] = kv[2].trim();
+    }
+  }
+  return result;
 }
 
 function parseAmneziaWireGuardBaseProxy(serverConfig, protocolConfig, clientConfig, namePrefix) {
-  const server = String(clientConfig.hostName || serverConfig.hostName || '').trim();
-  const port = Number(clientConfig.port ?? protocolConfig.port);
-  const privateKey = String(clientConfig.client_priv_key || '').trim();
-  const publicKey = String(clientConfig.server_pub_key || '').trim();
+  const cfgText = String(clientConfig.config || (typeof protocolConfig?.last_config === 'string' ? protocolConfig.last_config : ''));
+  const ifaceIni = parseIniSection(cfgText, 'Interface');
+  const peerIni = parseIniSection(cfgText, 'Peer');
+
+  let endpointHost = '';
+  let endpointPort = null;
+  if (peerIni.Endpoint) {
+    const ep = peerIni.Endpoint.match(/^([^:]+):(\d+)$/);
+    if (ep) {
+      endpointHost = ep[1].trim();
+      endpointPort = +ep[2];
+    }
+  }
+
+  const server = String(clientConfig.hostName || serverConfig.hostName || endpointHost || '').trim();
+  const port = Number(clientConfig.port ?? protocolConfig.port ?? endpointPort);
+  const privateKey = String(clientConfig.client_priv_key || ifaceIni.PrivateKey || '').trim();
+  const publicKey = String(clientConfig.server_pub_key || peerIni.PublicKey || '').trim();
   if (!server || !Number.isFinite(port) || !privateKey || !publicKey) return null;
 
-  const ipRaw = String(clientConfig.client_ip || '').trim();
+  const ipRaw = String(clientConfig.client_ip || ifaceIni.Address || '').trim();
   const ip = (ipRaw ? ipRaw.split(',')[0] : '10.0.0.2').split('/')[0].trim() || '10.0.0.2';
   const name = String(serverConfig.description || '').trim() || `${namePrefix}-${server}`;
 
@@ -871,28 +907,19 @@ function parseAmneziaWireGuardBaseProxy(serverConfig, protocolConfig, clientConf
     udp: true
   };
 
-  const psk = String(clientConfig.psk_key || '').trim();
+  const psk = String(clientConfig.psk_key || peerIni.PresharedKey || '').trim();
   if (psk) proxy['pre-shared-key'] = psk;
-  const mtu = toIntMaybe(clientConfig.mtu);
+  const mtu = toIntMaybe(clientConfig.mtu || ifaceIni.MTU);
   if (mtu !== null) proxy.mtu = mtu;
 
-  let pka = toIntMaybe(clientConfig.persistent_keepalive);
-  if (pka === null) {
-    const cfgText = String(clientConfig.config || '');
-    const mPka = cfgText.match(/^\s*PersistentKeepalive\s*=\s*(\d+)/im);
-    if (mPka && mPka[1]) pka = +mPka[1];
-  }
+  let pka = toIntMaybe(clientConfig.persistent_keepalive || peerIni.PersistentKeepalive);
   if (pka !== null && pka > 0) proxy['persistent-keepalive'] = pka;
 
   const dns1 = String(serverConfig.dns1 || '').trim();
   if (dns1) {
     setWireGuardDns(proxy, dns1);
-  } else {
-    const cfgText = String(clientConfig.config || '');
-    const mDns = cfgText.match(/^\s*DNS\s*=\s*([^\r\n]+)/im);
-    if (mDns && mDns[1]) {
-      setWireGuardDns(proxy, mDns[1].split(',')[0].trim());
-    }
+  } else if (ifaceIni.DNS) {
+    setWireGuardDns(proxy, ifaceIni.DNS);
   }
 
   return proxy;
@@ -907,14 +934,30 @@ function parseAmneziaWireGuardProxy(serverConfig, container) {
 }
 
 function parseAmneziaAwgProxy(serverConfig, container) {
-  const protocolConfig = parseJsonObjectMaybe(container?.awg);
+  const protocolConfig = parseJsonObjectMaybe(
+    container?.awg || container?.awg2 || container?.awg3 || container?.['amnezia-awg'] || container?.['amnezia-awg2']
+  );
   if (!protocolConfig) return null;
+
+  // If last_config is an INI config with [Interface] and [Peer], parse it directly
+  if (typeof protocolConfig?.last_config === 'string' && protocolConfig.last_config.includes('[Interface]')) {
+    const p = parseWireGuardConfig(protocolConfig.last_config);
+    if (p) {
+      if (serverConfig.description) p.name = serverConfig.description;
+      return p;
+    }
+  }
+
   const clientConfig = parseJsonObjectMaybe(protocolConfig?.last_config);
   if (!clientConfig) return null;
+
   const proxy = parseAmneziaWireGuardBaseProxy(serverConfig, protocolConfig, clientConfig, 'awg');
   if (!proxy) return null;
 
-  const { awg, version } = collectAwgOptions(awgLookup(clientConfig), protocolConfig.protocol_version);
+  const ifaceIni = clientConfig.config ? parseIniSection(clientConfig.config, 'Interface') : {};
+  const combined = { ...ifaceIni, ...clientConfig };
+
+  const { awg, version } = collectAwgOptions(awgLookup(combined), protocolConfig.protocol_version);
   proxy.awgVersion = version;
   proxy['amnezia-wg-option'] = awg;
 
@@ -984,17 +1027,17 @@ function parseAmneziaVpnJson(serverConfig) {
 
   for (const container of orderedContainers) {
     const containerName = String(container?.container || '').toLowerCase();
-    if (containerName === 'amnezia-awg' || containerName === 'amnezia-awg2') {
+    if (containerName.startsWith('amnezia-awg') || containerName === 'awg' || container?.awg || container?.awg2 || container?.awg3) {
       const awgProxy = parseAmneziaAwgProxy(serverConfig, container);
       if (awgProxy) return awgProxy;
       continue;
     }
-    if (containerName === 'amnezia-wireguard') {
+    if (containerName.startsWith('amnezia-wireguard') || containerName === 'wireguard' || container?.wireguard) {
       const wireGuardProxy = parseAmneziaWireGuardProxy(serverConfig, container);
       if (wireGuardProxy) return wireGuardProxy;
       continue;
     }
-    if (containerName === 'amnezia-xray') {
+    if (containerName.startsWith('amnezia-xray') || containerName === 'xray' || container?.xray) {
       const vlessProxy = parseAmneziaVlessProxy(serverConfig, container);
       if (vlessProxy) return vlessProxy;
     }
