@@ -193,7 +193,14 @@ function buildDns() {
       '+.telegram.org',
       '+.t.me'
     ],
-    'default-nameserver': ['8.8.8.8', '1.1.1.1', '9.9.9.9'],
+    'default-nameserver': ['77.88.8.8', '8.8.8.8', '1.1.1.1', '9.9.9.9'],
+    'direct-nameserver': [
+      'https://common.dot.dns.yandex.net/dns-query',
+      'tls://77.88.8.8',
+      'https://unfiltered.adguard-dns.com/dns-query',
+      '94.140.14.140',
+      '77.88.8.8'
+    ],
     nameserver: [
       'https://8.8.8.8/dns-query',
       'https://cloudflare-dns.com/dns-query'
