@@ -845,20 +845,10 @@ function collectAwgOptions(getOrObj, rawVersion = '') {
 
 function setWireGuardDns(proxy, dns) {
   if (!dns) return;
-  const dnsList = String(dns).split(',').map(d => d.trim()).filter(Boolean);
-  const validDns = [];
-  for (const d of dnsList) {
-    if (d) validDns.push(d);
-  }
-  // Keep Amnezia DNS (172.x) primary, but append public fallback (1.1.1.1)
-  // in case dnscrypt or amnezia-dns container experiences temporary downtime.
-  if (validDns.some(d => /^172\.(1[6-9]|2[0-9]|3[0-1])\./.test(d))) {
-    if (!validDns.includes('1.1.1.1')) validDns.push('1.1.1.1');
-  }
-  if (validDns.length > 0) {
-    proxy.dns = validDns;
-    proxy['remote-dns-resolve'] = true;
-  }
+  const firstDns = String(dns).split(',')[0].trim();
+  if (!firstDns) return;
+  proxy.dns = [firstDns];
+  proxy['remote-dns-resolve'] = true;
 }
 
 function parseIniSection(text, sectionName) {
