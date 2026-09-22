@@ -724,7 +724,7 @@ function buildRules() {
 function generateConfig(userName, ruProviderUrl, foreignProviderUrl, excludePackages = []) {
   return {
     mode: 'rule',
-    ipv6: true,
+    ipv6: false,
     'log-level': 'info',
     'allow-lan': false,
     'unified-delay': true,
