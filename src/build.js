@@ -737,6 +737,7 @@ function generateConfig(userName, ruProviderUrl, foreignProviderUrl, excludePack
     'allow-lan': false,
     'unified-delay': true,
     'tcp-concurrent': true,
+    'global-client-fingerprint': 'chrome',
 
     dns: buildDns(),
     tun: buildTun(excludePackages),
