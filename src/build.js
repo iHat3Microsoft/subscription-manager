@@ -657,6 +657,13 @@ function buildRuleProviders() {
       path: './rule-sets/games-direct.yaml',
       interval: 86400
     },
+    quic: {
+      type: 'inline',
+      behavior: 'classical',
+      payload: [
+        'AND,((NETWORK,udp),(DST-PORT,443))'
+      ]
+    },
     discord_vc: {
       type: 'inline',
       behavior: 'classical',
@@ -689,6 +696,13 @@ function buildRules() {
     'IP-CIDR,172.16.0.0/12,DIRECT,no-resolve',
     'AND,((NETWORK,tcp),(DST-PORT,22)),DIRECT',
     'PROCESS-NAME,ssh,DIRECT',
+    'RULE-SET,ru-blocked,🚫 Заблокированные сайты (RU)',
+    'RULE-SET,ru-bundle,🚫 Заблокированные сайты (RU)',
+    'RULE-SET,rknasnblock,🚫 Заблокированные сайты (RU)',
+    'DOMAIN-SUFFIX,ru,DIRECT',
+    'DOMAIN-SUFFIX,рф,DIRECT',
+    'DOMAIN-SUFFIX,su,DIRECT',
+    'RULE-SET,quic,REJECT-DROP',
     'RULE-SET,geosite-youtube,▶️ YouTube',
     'OR,((RULE-SET,geosite-discord),(RULE-SET,discord_voiceips),(PROCESS-NAME,Discord.exe)),💬 Discord',
     'RULE-SET,discord_vc,💬 Discord',
@@ -706,15 +720,9 @@ function buildRules() {
     'RULE-SET,geosite-soundcloud,🌍 Иностранные серверы',
     'OR,((RULE-SET,geosite-openai),(RULE-SET,google-gemini),(RULE-SET,geosite-anthropic),(DOMAIN-KEYWORD,grok),(DOMAIN-SUFFIX,grok.com),(DOMAIN-SUFFIX,appcenter.ms),(DOMAIN-KEYWORD,copilot),(DOMAIN-SUFFIX,copilot.microsoft.com),(PROCESS-NAME-REGEX,(?i).*(chatgpt|claude|copilot|gemini|cursor|windsurf|cline|antigravity|opencode).*),(PROCESS-NAME,opencode),(PROCESS-NAME,com.openai.chatgpt),(PROCESS-NAME,com.anthropic.claude),(PROCESS-NAME,com.microsoft.copilot),(PROCESS-NAME,ai.perplexity.app.android)),🤖 AI (Нейронки)',
     'RULE-SET,geosite-supercell,👾 Brawl Stars',
-    'RULE-SET,ru-blocked,🚫 Заблокированные сайты (RU)',
-    'RULE-SET,ru-bundle,🚫 Заблокированные сайты (RU)',
-    'RULE-SET,rknasnblock,🚫 Заблокированные сайты (RU)',
     'RULE-SET,category-porn,🔞 18+',
     'RULE-SET,my-rules,📋 My Rules',
     'GEOIP,RU,DIRECT',
-    'DOMAIN-SUFFIX,ru,DIRECT',
-    'DOMAIN-SUFFIX,рф,DIRECT',
-    'DOMAIN-SUFFIX,su,DIRECT',
     'OR,((RULE-SET,google-geoip),(RULE-SET,geosite-google)),🔎 Google',
     'MATCH,🌐 Остальной трафик (MATCH)'
   ];
