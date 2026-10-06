@@ -105,12 +105,8 @@ async function parseProxy(content, baseName) {
     if (fetched && fetched.length > 0) {
       return fetched;
     }
-    const sub = parsers.parseSubscriptionUrl(content);
-    if (sub) {
-      sub.name = `sub-${baseName || 'unknown'}`;
-      sub.header = { 'User-Agent': 'clash.meta' };
-      return sub;
-    }
+    console.warn(`[warn] failed to ingest proxies from subscription URL in ${baseName}: ${content}`);
+    return null;
   }
 
   // Try parsing as share link or vpn://
@@ -163,11 +159,31 @@ async function ingestHttpProxyList(url) {
   });
 }
 
+function isValidProxy(p) {
+  if (!p || typeof p !== 'object') return false;
+  if (!p.type || typeof p.type !== 'string') return false;
+  const server = String(p.server || '').trim();
+  const port = Number(p.port);
+  if (!server) return false;
+  if (!Number.isInteger(port) || port <= 0 || port > 65535) return false;
+  p.port = port;
+  p.server = server;
+  return true;
+}
+
 function asProxyList(result, baseName) {
   if (!result) return [];
   const list = Array.isArray(result) ? result : [result];
   return list
-    .filter(p => p && typeof p === 'object')
+    .filter(p => {
+      if (!isValidProxy(p)) {
+        if (p && typeof p === 'object') {
+          console.warn(`[warn] dropping invalid proxy without server/port in ${baseName}: ${JSON.stringify(p)}`);
+        }
+        return false;
+      }
+      return true;
+    })
     .map((p, idx, arr) => {
       if (!p._keepName) {
         p.name = arr.length === 1 ? baseName : `${baseName}-${idx + 1}`;
@@ -841,8 +857,8 @@ async function buildAll() {
       return p;
     };
 
-    ruProxies = ruProxies.map(sanitizeWireGuard);
-    foreignProxies = foreignProxies.map(sanitizeWireGuard);
+    ruProxies = ruProxies.map(sanitizeWireGuard).filter(isValidProxy);
+    foreignProxies = foreignProxies.map(sanitizeWireGuard).filter(isValidProxy);
 
     const sortProxies = (a, b) => {
       const a10g = a.name.includes('10гбит') || a.name.includes('10G') || a.name.includes('10gbit');
@@ -852,9 +868,30 @@ async function buildAll() {
       return a.name.localeCompare(b.name);
     };
 
-    // Deduplicate
-    ruProxies = [...new Map(ruProxies.map(item => [item.name, item])).values()].sort(sortProxies);
-    foreignProxies = [...new Map(foreignProxies.map(item => [item.name, item])).values()].sort(sortProxies);
+    // Deduplicate by endpoint (type:server:port), then disambiguate duplicate names
+    const deduplicateProxies = list => {
+      const seen = new Set();
+      const unique = [];
+      for (const p of list) {
+        const key = `${p.type}:${p.server}:${p.port}`;
+        if (seen.has(key)) continue;
+        seen.add(key);
+        unique.push(p);
+      }
+      const nameCounts = new Map();
+      for (const p of unique) {
+        const base = p.name || 'proxy';
+        const count = (nameCounts.get(base) || 0) + 1;
+        nameCounts.set(base, count);
+        if (count > 1) {
+          p.name = `${base}-${count}`;
+        }
+      }
+      return unique.sort(sortProxies);
+    };
+
+    ruProxies = deduplicateProxies(ruProxies);
+    foreignProxies = deduplicateProxies(foreignProxies);
 
     if (ruProxies.length === 0 && foreignProxies.length === 0) {
       console.log(`[Warning] No proxies found for user ${user}. Skipping.`);
