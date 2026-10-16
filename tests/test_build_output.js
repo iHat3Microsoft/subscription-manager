@@ -84,6 +84,8 @@ async function testProxyGroups() {
 async function testRuleProviders() {
   const providers = build.buildRuleProviders();
   assert.strictEqual(providers.quic, undefined, 'inline quic provider must be removed');
+  assert.ok(providers.oisd_small, 'oisd_small must be present');
+  assert.strictEqual(providers.oisd_big, undefined, 'oisd_big must be replaced');
 
   assert.strictEqual(providers['ru-blocked'].behavior, 'domain');
   assert.strictEqual(providers['ru-blocked'].format, 'text');
@@ -99,6 +101,7 @@ async function testRules() {
   const stableRules = build.buildRules({ experimental: false });
   assert.strictEqual(stableRules.some(r => r.startsWith('IP-CIDR6,::/0')), false);
   assert.strictEqual(stableRules.some(r => r.includes('quic')), false);
+  assert.ok(stableRules.includes('RULE-SET,oisd_small,🚫 Реклама'), 'oisd_small must be used in rules');
 
   const expRules = build.buildRules({ experimental: true });
   assert.strictEqual(expRules[0], 'IP-CIDR6,::/0,REJECT-DROP,no-resolve');

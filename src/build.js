@@ -536,12 +536,12 @@ function buildProxyGroups(options = {}) {
 
 function buildRuleProviders() {
   return {
-    oisd_big: {
+    oisd_small: {
       type: 'http',
       behavior: 'domain',
       format: 'mrs',
-      url: 'https://github.com/legiz-ru/mihomo-rule-sets/raw/main/oisd/big.mrs',
-      path: './rule-sets/oisd_big.mrs',
+      url: 'https://github.com/legiz-ru/mihomo-rule-sets/raw/main/oisd/small.mrs',
+      path: './rule-sets/oisd_small.mrs',
       interval: 86400
     },
     discord_voiceips: {
@@ -806,7 +806,7 @@ function buildRules(options = {}) {
     'RULE-SET,ru_apps,DIRECT',
 
     // 4. Реклама
-    'RULE-SET,oisd_big,🚫 Реклама',
+    'RULE-SET,oisd_small,🚫 Реклама',
 
     // 4. Целевые сервисы (домены и процессы)
     'RULE-SET,geosite-youtube,▶️ YouTube',
