@@ -217,12 +217,12 @@ function buildDns() {
       '94.140.14.140'
     ],
     'proxy-server-nameserver': [
-      'https://common.dot.dns.yandex.net/dns-query',
-      'tls://77.88.8.8'
+      'https://common.dot.dns.yandex.net/dns-query#disable-ipv6=true',
+      'tls://77.88.8.8#disable-ipv6=true'
     ],
     'direct-nameserver': [
-      'https://common.dot.dns.yandex.net/dns-query',
-      '77.88.8.8'
+      'https://common.dot.dns.yandex.net/dns-query#disable-ipv6=true',
+      '77.88.8.8#disable-ipv6=true'
     ],
     nameserver: [
       'https://1.1.1.1/dns-query#🌍 Иностранные серверы',
@@ -230,16 +230,16 @@ function buildDns() {
     ],
     'nameserver-policy': {
       'geosite:category-ru': [
-        'https://common.dot.dns.yandex.net/dns-query',
-        '77.88.8.8'
+        'https://common.dot.dns.yandex.net/dns-query#disable-ipv6=true',
+        '77.88.8.8#disable-ipv6=true'
       ],
       '+.ru': [
-        'https://common.dot.dns.yandex.net/dns-query',
-        '77.88.8.8'
+        'https://common.dot.dns.yandex.net/dns-query#disable-ipv6=true',
+        '77.88.8.8#disable-ipv6=true'
       ],
       '+.xn--p1ai': [
-        'https://common.dot.dns.yandex.net/dns-query',
-        '77.88.8.8'
+        'https://common.dot.dns.yandex.net/dns-query#disable-ipv6=true',
+        '77.88.8.8#disable-ipv6=true'
       ]
     }
   };
@@ -418,7 +418,7 @@ function buildProxyGroups(options = {}) {
       name: '🔎 Google',
       type: 'select',
       icon: 'https://cdn.jsdelivr.net/gh/Koolson/Qure@master/IconSet/Color/Google_Search.png',
-      proxies: ['DIRECT', '🌍 Иностранные серверы'],
+      proxies: ['DIRECT', '♻️ Автовыбор (Иностранные)', '🌍 Иностранные серверы'],
       use: ['foreign_servers']
     },
     {
@@ -488,7 +488,7 @@ function buildProxyGroups(options = {}) {
       type: 'select',
       hidden: true,
       icon: 'https://cdn.jsdelivr.net/gh/Koolson/Qure@master/IconSet/Color/Spark.png',
-      proxies: ['🌍 Иностранные серверы'],
+      proxies: ['♻️ Автовыбор (Иностранные)', '🌍 Иностранные серверы'],
       use: ['foreign_servers']
     },
     {
@@ -837,14 +837,14 @@ function buildRules(options = {}) {
     'DOMAIN-SUFFIX,xn--p1ai,DIRECT',
     'DOMAIN-SUFFIX,su,DIRECT',
 
-    // 7. IP-правила (ВСЕ строго внизу и с no-resolve!)
+    // 7. IP-правила (в самом низу перед MATCH)
     'RULE-SET,discord_voiceips,💬 Discord,no-resolve',
     'RULE-SET,telegram-ips,➤ Telegram,no-resolve',
     'RULE-SET,facebook-ips,📞 WhatsApp,no-resolve',
     'IP-ASN,32934,📸 Instagram & Threads,no-resolve',
     'RULE-SET,google-geoip,🔎 Google,no-resolve',
     'GEOIP,RU,DIRECT',
-    'RULE-SET,rknasnblock,🚫 Заблокированные сайты (RU),no-resolve',
+    'RULE-SET,rknasnblock,🚫 Заблокированные сайты (RU)',
 
     // 8. Финальный фоллбэк
     'MATCH,🌐 Остальной трафик (MATCH)'
@@ -1054,11 +1054,22 @@ async function buildAll(overrideArg) {
     ruProxies = ruProxies.map(sanitizeWireGuard).filter(isValidProxy);
     foreignProxies = foreignProxies.map(sanitizeWireGuard).filter(isValidProxy);
 
+    const getProtocolRank = p => {
+      const type = String(p.type || '').toLowerCase();
+      if (type === 'hysteria2' || type === 'hysteria') return 30;
+      if (type === 'wireguard') return 20;
+      if (type === 'vless') return 10;
+      return 0;
+    };
+
     const sortProxies = (a, b) => {
       const a10g = a.name.includes('10гбит') || a.name.includes('10G') || a.name.includes('10gbit');
       const b10g = b.name.includes('10гбит') || b.name.includes('10G') || b.name.includes('10gbit');
       if (a10g && !b10g) return -1;
       if (!a10g && b10g) return 1;
+      const aRank = getProtocolRank(a);
+      const bRank = getProtocolRank(b);
+      if (aRank !== bRank) return bRank - aRank;
       return a.name.localeCompare(b.name);
     };
 

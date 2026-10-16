@@ -14,6 +14,8 @@ async function testDns() {
 
   assert.ok(Array.isArray(dns['proxy-server-nameserver']), 'proxy-server-nameserver must be an array');
   assert.ok(dns['proxy-server-nameserver'].some(s => s.includes('yandex')), 'proxy-server-nameserver must include yandex');
+  assert.ok(dns['proxy-server-nameserver'].every(s => s.includes('disable-ipv6=true')), 'proxy-server-nameserver must have disable-ipv6=true');
+  assert.ok(dns['direct-nameserver'].every(s => s.includes('disable-ipv6=true')), 'direct-nameserver must have disable-ipv6=true');
 
   assert.ok(dns.nameserver.every(ns => ns.includes('#🌍 Иностранные серверы')), 'nameserver DoH must route to proxy group via # suffix');
   assert.ok(dns.nameserver.some(ns => ns.includes('1.1.1.1')), 'nameserver must include 1.1.1.1');
@@ -69,6 +71,12 @@ async function testProxyGroups() {
   const expForeign = expGroups.find(g => g.name === '🌍 Иностранные серверы');
   assert.ok(expForeign.proxies.includes('⚖️ Балансировка (Иностранные)'));
 
+  const aiGroup = stableGroups.find(g => g.name === '🤖 AI (Нейронки)');
+  assert.deepStrictEqual(aiGroup.proxies, ['♻️ Автовыбор (Иностранные)', '🌍 Иностранные серверы']);
+
+  const googleGroup = stableGroups.find(g => g.name === '🔎 Google');
+  assert.deepStrictEqual(googleGroup.proxies, ['DIRECT', '♻️ Автовыбор (Иностранные)', '🌍 Иностранные серверы']);
+
   console.log('ok - Proxy groups and sticky-sessions load-balance verified');
 }
 
@@ -109,9 +117,9 @@ async function testRules() {
   assert.ok(xnDirectIdx > 0, 'DOMAIN-SUFFIX,xn--p1ai,DIRECT must exist');
   assert.strictEqual(stableRules.some(r => r.includes('DOMAIN-SUFFIX,рф')), false, 'Cyrillic .рф must be replaced with punycode');
 
-  // IP rules with no-resolve at the bottom
+  // IP rules at the bottom
   assert.ok(rknAsnIdx > ruDirectIdx, 'rknasnblock must be below domain rules');
-  assert.ok(stableRules.find(r => r.includes('rknasnblock')).endsWith('no-resolve'), 'rknasnblock must have no-resolve');
+  assert.strictEqual(stableRules.find(r => r.includes('rknasnblock')), 'RULE-SET,rknasnblock,🚫 Заблокированные сайты (RU)', 'rknasnblock must resolve unclassified CDN IPs');
   assert.ok(stableRules.find(r => r.startsWith('GEOIP,RU')).endsWith('no-resolve') || stableRules.find(r => r === 'GEOIP,RU,DIRECT'), 'GEOIP,RU must be near bottom');
   assert.strictEqual(matchIdx, stableRules.length - 1, 'MATCH must be the final rule');
 
