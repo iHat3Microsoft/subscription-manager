@@ -75,7 +75,7 @@ Amnezia JSON, dead URL, custom.yaml) against a master golden snapshot.
 The user mentioned a `dev` branch that existed on the frozen GitHub account
 but was never pushed to GitLab. Some changes may be lost. TODO:
 - Check if `dev` exists on GitLab (`git fetch origin dev` or check web UI)
-- Check the GitHub mirror: https://github.com/iHat3Microsoft/subscription-manager
+- Check the GitHub mirror (if accessible)
 - Compare dev vs master to identify lost changes
 - Determine if anything is needed for production
 

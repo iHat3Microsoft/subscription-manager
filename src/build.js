@@ -199,50 +199,84 @@ function buildDns() {
     enable: true,
     listen: '127.0.0.1:6868',
     ipv6: false,
-    'prefer-ipv4': true,
+    'cache-algorithm': 'arc',
     'enhanced-mode': 'fake-ip',
     'fake-ip-range': '198.18.0.0/15',
     'fake-ip-filter': [
       '*.lan',
       '*.local',
       '+.msftconnecttest.com',
+      '+.msftncsi.com',
       '+.telegram.org',
-      '+.t.me'
+      '+.t.me',
+      '+.stun.*'
     ],
-    'default-nameserver': ['77.88.8.8', '8.8.8.8', '1.1.1.1', '9.9.9.9'],
+    'respect-rules': true,
+    'default-nameserver': [
+      '77.88.8.8',
+      '94.140.14.140'
+    ],
+    'proxy-server-nameserver': [
+      'https://common.dot.dns.yandex.net/dns-query',
+      'tls://77.88.8.8'
+    ],
     'direct-nameserver': [
       'https://common.dot.dns.yandex.net/dns-query',
-      'tls://77.88.8.8',
-      'https://unfiltered.adguard-dns.com/dns-query',
-      '94.140.14.140',
       '77.88.8.8'
     ],
     nameserver: [
-      'https://8.8.8.8/dns-query',
-      'https://cloudflare-dns.com/dns-query'
+      'https://1.1.1.1/dns-query#🌍 Иностранные серверы',
+      'https://8.8.8.8/dns-query#🌍 Иностранные серверы'
     ],
     'nameserver-policy': {
-      'geosite:category-ru': ['77.88.8.8', '8.8.8.8']
+      'geosite:category-ru': [
+        'https://common.dot.dns.yandex.net/dns-query',
+        '77.88.8.8'
+      ],
+      '+.ru': [
+        'https://common.dot.dns.yandex.net/dns-query',
+        '77.88.8.8'
+      ],
+      '+.xn--p1ai': [
+        'https://common.dot.dns.yandex.net/dns-query',
+        '77.88.8.8'
+      ]
     }
   };
 }
 
-function buildTun(excludePackages) {
-  return {
+function buildTun(excludePackages, options = {}) {
+  const isExp = Boolean(options.experimental);
+  const routeExclude = isExp
+    ? [
+        '0.0.0.0/8', '10.0.0.0/8', '100.64.0.0/10', '127.0.0.0/8',
+        '169.254.0.0/16', '172.16.0.0/12', '192.0.0.0/24', '192.0.2.0/24',
+        '192.88.99.0/24', '192.168.0.0/16', '198.51.100.0/24', '203.0.113.0/24',
+        '224.0.0.0/3', 'fc00::/7', 'fe80::/10'
+      ]
+    : [
+        '0.0.0.0/8', '10.0.0.0/8', '100.64.0.0/10', '127.0.0.0/8',
+        '169.254.0.0/16', '172.16.0.0/12', '192.0.0.0/24', '192.0.2.0/24',
+        '192.88.99.0/24', '192.168.0.0/16', '198.51.100.0/24', '203.0.113.0/24',
+        '224.0.0.0/3', '::/127', 'fc00::/7', 'fe80::/10', 'ff00::/8'
+      ];
+
+  const tun = {
     enable: true,
-    stack: 'mixed',
+    stack: isExp ? 'mips' : 'mixed',
     'auto-route': true,
     'auto-detect-interface': true,
     'dns-hijack': ['any:53', 'tcp://any:53'],
     'strict-route': true,
-    'route-exclude-address': [
-      '0.0.0.0/8', '10.0.0.0/8', '100.64.0.0/10', '127.0.0.0/8',
-      '169.254.0.0/16', '172.16.0.0/12', '192.0.0.0/24', '192.0.2.0/24',
-      '192.88.99.0/24', '192.168.0.0/16', '198.51.100.0/24', '203.0.113.0/24',
-      '224.0.0.0/3', '::/127', 'fc00::/7', 'fe80::/10', 'ff00::/8'
-    ],
+    'route-exclude-address': routeExclude,
     'exclude-package': excludePackages
   };
+
+  if (isExp) {
+    tun['inet6-address'] = ['fdfe:dcba:9876::1/126'];
+  }
+
+  return tun;
 }
 
 function buildSniffer() {
@@ -252,7 +286,8 @@ function buildSniffer() {
     'parse-pure-ip': true,
     sniff: {
       HTTP: { ports: [80, '8080-8880'], 'override-destination': true },
-      TLS: { ports: [443, 8443] }
+      TLS: { ports: [443, 8443] },
+      QUIC: { ports: [443, 8443] }
     },
     'skip-dst-address': [
       '0.0.0.0/8',
@@ -299,8 +334,14 @@ function buildProxyProviders(ruProviderUrl, foreignProviderUrl) {
   };
 }
 
-function buildProxyGroups() {
-  return [
+function buildProxyGroups(options = {}) {
+  const isExp = Boolean(options.experimental);
+  const foreignProxies = ['♻️ Автовыбор (Иностранные)'];
+  if (isExp) {
+    foreignProxies.push('⚖️ Балансировка (Иностранные)');
+  }
+
+  const groups = [
     {
       name: '♻️ Автовыбор (Иностранные)',
       type: 'fallback',
@@ -333,12 +374,30 @@ function buildProxyGroups() {
       timeout: 5000,
       'max-failed-times': 3,
       use: ['ru_servers', 'foreign_servers']
-    },
+    }
+  ];
+
+  if (isExp) {
+    groups.push({
+      name: '⚖️ Балансировка (Иностранные)',
+      type: 'load-balance',
+      strategy: 'sticky-sessions',
+      hidden: true,
+      lazy: true,
+      url: 'https://www.gstatic.com/generate_204',
+      interval: 120,
+      timeout: 5000,
+      'max-failed-times': 3,
+      use: ['foreign_servers']
+    });
+  }
+
+  groups.push(
     {
       name: '🌍 Иностранные серверы',
       type: 'select',
       icon: 'https://cdn.jsdelivr.net/gh/Koolson/Qure@master/IconSet/Color/Global.png',
-      proxies: ['♻️ Автовыбор (Иностранные)'],
+      proxies: foreignProxies,
       use: ['foreign_servers']
     },
     {
@@ -471,7 +530,9 @@ function buildProxyGroups() {
       proxies: ['🌍 Иностранные серверы', 'DIRECT'],
       use: ['foreign_servers']
     }
-  ];
+  );
+
+  return groups;
 }
 
 function buildRuleProviders() {
@@ -543,9 +604,9 @@ function buildRuleProviders() {
     'geosite-tiktok': {
       behavior: 'domain',
       type: 'http',
-      format: 'yaml',
-      url: 'https://raw.githubusercontent.com/MetaCubeX/meta-rules-dat/refs/heads/meta/geo/geosite/tiktok.yaml',
-      path: './rule-sets/tiktok.yaml',
+      format: 'mrs',
+      url: 'https://github.com/MetaCubeX/meta-rules-dat/raw/meta/geo/geosite/tiktok.mrs',
+      path: './rule-sets/tiktok.mrs',
       interval: 86400
     },
     'geosite-supercell': {
@@ -629,11 +690,11 @@ function buildRuleProviders() {
       interval: 86400
     },
     'ru-blocked': {
-      behavior: 'classical',
+      behavior: 'domain',
       type: 'http',
-      format: 'yaml',
+      format: 'text',
       url: 'https://cdn.jsdelivr.net/gh/shvchk/unblock-net/lists/clash/ru-blocked',
-      path: './rule-sets/ru-blocked.yaml',
+      path: './rule-sets/ru-blocked.txt',
       interval: 86400
     },
     'ru-bundle': {
@@ -718,56 +779,86 @@ function buildRuleProviders() {
   };
 }
 
-function buildRules() {
-  return [
-    'RULE-SET,oisd_big,🚫 Реклама',
-    'RULE-SET,games-direct,🎮 Игры (DIRECT)',
-    'RULE-SET,torrent-clients,DIRECT',
-    'PROCESS-NAME-REGEX,(?i).*torrent.*,DIRECT',
-    'RULE-SET,torrent-trackers,🌍 Иностранные серверы',
-    'RULE-SET,ru_apps,DIRECT',
+function buildRules(options = {}) {
+  const isExp = Boolean(options.experimental);
+  const rules = [];
+
+  if (isExp) {
+    rules.push('IP-CIDR6,::/0,REJECT-DROP,no-resolve');
+  }
+
+  rules.push(
+    // 1. Локальные сети и базовые порты/процессы
     'IP-CIDR,127.0.0.0/8,DIRECT,no-resolve',
     'IP-CIDR,192.168.0.0/16,DIRECT,no-resolve',
     'IP-CIDR,10.0.0.0/8,DIRECT,no-resolve',
     'IP-CIDR,172.16.0.0/12,DIRECT,no-resolve',
+    'IP-CIDR,100.64.0.0/10,DIRECT,no-resolve',
     'AND,((NETWORK,tcp),(DST-PORT,22)),DIRECT',
     'PROCESS-NAME,ssh,DIRECT',
+    'RULE-SET,torrent-clients,DIRECT',
+    'PROCESS-NAME-REGEX,(?i).*torrent.*,DIRECT',
+    'RULE-SET,games-direct,🎮 Игры (DIRECT)',
+    'RULE-SET,ru_apps,DIRECT',
+
+    // 2. Пользовательские кастомные правила (самый высокий приоритет!)
+    'RULE-SET,my-rules,📋 My Rules',
+
+    // 3. Реклама
+    'RULE-SET,oisd_big,🚫 Реклама',
+
+    // 4. Целевые сервисы (домены и процессы)
     'RULE-SET,geosite-youtube,▶️ YouTube',
-    'OR,((RULE-SET,geosite-discord),(RULE-SET,discord_voiceips),(PROCESS-NAME,Discord.exe)),💬 Discord',
     'RULE-SET,discord_vc,💬 Discord',
+    'OR,((RULE-SET,geosite-discord),(PROCESS-NAME,Discord.exe)),💬 Discord',
     'PROCESS-NAME,com.instagram.android,📸 Instagram & Threads',
     'PROCESS-NAME,com.instagram.barcelona,📸 Instagram & Threads',
-    'OR,((RULE-SET,geosite-instagram),(RULE-SET,geosite-meta),(DOMAIN-SUFFIX,cdninstagram.com),(DOMAIN-SUFFIX,fbcdn.net),(DOMAIN-SUFFIX,fbsbx.com),(DOMAIN-SUFFIX,instagram.com),(DOMAIN-SUFFIX,threads.net),(DOMAIN-SUFFIX,graph.instagram.com),(DOMAIN-SUFFIX,graph.facebook.com),(DOMAIN-KEYWORD,instagram)),📸 Instagram & Threads',
-    'IP-ASN,32934,📸 Instagram & Threads',
-    'OR,((RULE-SET,facebook-ips),(RULE-SET,whatsapp-domains)),📞 WhatsApp',
-    'RULE-SET,geosite-facebook,👥 Facebook',
-    'OR,((RULE-SET,telegram-ips),(RULE-SET,telegram-domains)),➤ Telegram',
+    'OR,((RULE-SET,geosite-instagram),(DOMAIN-SUFFIX,cdninstagram.com),(DOMAIN-SUFFIX,fbcdn.net),(DOMAIN-SUFFIX,fbsbx.com),(DOMAIN-SUFFIX,instagram.com),(DOMAIN-SUFFIX,threads.net),(DOMAIN-SUFFIX,graph.instagram.com),(DOMAIN-KEYWORD,instagram)),📸 Instagram & Threads',
+    'RULE-SET,whatsapp-domains,📞 WhatsApp',
+    'OR,((RULE-SET,geosite-facebook),(RULE-SET,geosite-meta),(DOMAIN-SUFFIX,graph.facebook.com)),👥 Facebook',
+    'RULE-SET,telegram-domains,➤ Telegram',
     'PROCESS-NAME-REGEX,(?i).*ayugram.*,➤ Telegram',
     'PROCESS-NAME-REGEX,(?i).*telegram.*,➤ Telegram',
     'PROCESS-NAME,org.telegram.messenger,➤ Telegram',
     'RULE-SET,geosite-tiktok,🎵 TikTok',
     'RULE-SET,geosite-soundcloud,🌍 Иностранные серверы',
-    'OR,((RULE-SET,geosite-openai),(RULE-SET,google-gemini),(RULE-SET,geosite-anthropic),(DOMAIN-KEYWORD,grok),(DOMAIN-SUFFIX,grok.com),(DOMAIN-SUFFIX,appcenter.ms),(DOMAIN-KEYWORD,copilot),(DOMAIN-SUFFIX,copilot.microsoft.com),(PROCESS-NAME-REGEX,(?i).*(chatgpt|claude|copilot|gemini|cursor|windsurf|cline|antigravity|opencode).*),(PROCESS-NAME,opencode),(PROCESS-NAME,com.openai.chatgpt),(PROCESS-NAME,com.anthropic.claude),(PROCESS-NAME,com.microsoft.copilot),(PROCESS-NAME,ai.perplexity.app.android)),🤖 AI (Нейронки)',
+    'OR,((RULE-SET,geosite-openai),(RULE-SET,google-gemini),(RULE-SET,geosite-anthropic),(DOMAIN-SUFFIX,grok.com),(DOMAIN-SUFFIX,x.ai),(DOMAIN-SUFFIX,appcenter.ms),(DOMAIN-SUFFIX,copilot.microsoft.com),(PROCESS-NAME-REGEX,(?i).*(chatgpt|claude|copilot|gemini|cursor|windsurf|cline|antigravity|opencode).*),(PROCESS-NAME,opencode),(PROCESS-NAME,com.openai.chatgpt),(PROCESS-NAME,com.anthropic.claude),(PROCESS-NAME,com.microsoft.copilot),(PROCESS-NAME,ai.perplexity.app.android)),🤖 AI (Нейронки)',
     'RULE-SET,geosite-supercell,👾 Brawl Stars',
-    'RULE-SET,ru-blocked,🚫 Заблокированные сайты (RU)',
-    'RULE-SET,ru-bundle,🚫 Заблокированные сайты (RU)',
-    'RULE-SET,rknasnblock,🚫 Заблокированные сайты (RU)',
     'RULE-SET,category-porn,🔞 18+',
-    'RULE-SET,my-rules,📋 My Rules',
-    'GEOIP,RU,DIRECT',
+    'RULE-SET,torrent-trackers,🌍 Иностранные серверы',
+    'RULE-SET,geosite-google,🔎 Google',
+
+    // 5. Заблокированные домены РФ (должны идти ДО безусловных .ru)
+    'RULE-SET,ru-bundle,🚫 Заблокированные сайты (RU)',
+    'RULE-SET,ru-blocked,🚫 Заблокированные сайты (RU)',
+
+    // 6. Прямой RU-трафик по доменным зонам
     'DOMAIN-SUFFIX,ru,DIRECT',
-    'DOMAIN-SUFFIX,рф,DIRECT',
+    'DOMAIN-SUFFIX,xn--p1ai,DIRECT',
     'DOMAIN-SUFFIX,su,DIRECT',
-    'OR,((RULE-SET,google-geoip),(RULE-SET,geosite-google)),🔎 Google',
+
+    // 7. IP-правила (ВСЕ строго внизу и с no-resolve!)
+    'RULE-SET,discord_voiceips,💬 Discord,no-resolve',
+    'RULE-SET,telegram-ips,➤ Telegram,no-resolve',
+    'RULE-SET,facebook-ips,📞 WhatsApp,no-resolve',
+    'IP-ASN,32934,📸 Instagram & Threads,no-resolve',
+    'RULE-SET,google-geoip,🔎 Google,no-resolve',
+    'GEOIP,RU,DIRECT',
+    'RULE-SET,rknasnblock,🚫 Заблокированные сайты (RU),no-resolve',
+
+    // 8. Финальный фоллбэк
     'MATCH,🌐 Остальной трафик (MATCH)'
-  ];
+  );
+
+  return rules;
 }
 
 // Generate the complete Mihomo config template for a user
-function generateConfig(userName, ruProviderUrl, foreignProviderUrl, excludePackages = []) {
+function generateConfig(userName, ruProviderUrl, foreignProviderUrl, excludePackages = [], options = {}) {
+  const isExp = Boolean(options.experimental);
   return {
     mode: 'rule',
-    ipv6: false,
+    ipv6: isExp,
     'log-level': 'info',
     'allow-lan': false,
     'unified-delay': true,
@@ -775,12 +866,12 @@ function generateConfig(userName, ruProviderUrl, foreignProviderUrl, excludePack
     'global-client-fingerprint': 'chrome',
 
     dns: buildDns(),
-    tun: buildTun(excludePackages),
+    tun: buildTun(excludePackages, options),
     sniffer: buildSniffer(),
     'proxy-providers': buildProxyProviders(ruProviderUrl, foreignProviderUrl),
-    'proxy-groups': buildProxyGroups(),
+    'proxy-groups': buildProxyGroups(options),
     'rule-providers': buildRuleProviders(),
-    rules: buildRules()
+    rules: buildRules(options)
   };
 }
 
@@ -805,12 +896,115 @@ async function collectProxiesFromDir(dir) {
   return proxies;
 }
 
+const BUILD_MODE_FILE = path.join(DATA_DIR, '.build-mode.json');
+const TEST_USER = process.env.TEST_USER || 'Me';
+
+function getStoredBuildMode() {
+  if (fs.existsSync(BUILD_MODE_FILE)) {
+    try {
+      const data = JSON.parse(fs.readFileSync(BUILD_MODE_FILE, 'utf8'));
+      if (data && data.mode) return data.mode;
+    } catch {
+      // ignore
+    }
+  }
+  return 'stable';
+}
+
+function setStoredBuildMode(mode) {
+  try {
+    fs.mkdirSync(path.dirname(BUILD_MODE_FILE), { recursive: true });
+    fs.writeFileSync(BUILD_MODE_FILE, JSON.stringify({ mode, updatedAt: new Date().toISOString() }, null, 2), { mode: 0o600 });
+  } catch (e) {
+    console.warn(`[warn] failed to save build mode: ${e.message}`);
+  }
+}
+
+function isTestTarget(user, allUsers) {
+  if (user === TEST_USER) return true;
+  if (!allUsers.includes(TEST_USER) && (process.env.NODE_ENV === 'test' || process.env.CI) && user === allUsers[0]) {
+    return true;
+  }
+  return false;
+}
+
+function applyCustomConfig(baseConfig, userDir, user) {
+  const masterConfig = JSON.parse(JSON.stringify(baseConfig));
+  const customPath = path.join(userDir, 'custom.yaml');
+  if (!fs.existsSync(customPath)) return masterConfig;
+
+  try {
+    const customConfig = yaml.load(fs.readFileSync(customPath, 'utf8'));
+    if (customConfig && typeof customConfig === 'object') {
+      for (const key of Object.keys(customConfig)) {
+        if (key === 'proxy-groups' && Array.isArray(customConfig[key])) {
+          // Сливаем группы прокси по имени
+          for (const cg of customConfig[key]) {
+            const existingGroup = masterConfig['proxy-groups'].find(g => g.name === cg.name);
+            if (existingGroup) {
+              Object.assign(existingGroup, cg);
+            } else {
+              masterConfig['proxy-groups'].push(cg);
+            }
+          }
+        } else if (key === 'rules' && Array.isArray(customConfig[key])) {
+          // Добавляем кастомные правила в САМОЕ НАЧАЛО
+          masterConfig.rules = [...customConfig[key], ...masterConfig.rules];
+        } else if (key === 'tun-exclude-packages' && Array.isArray(customConfig[key])) {
+          // Override списка исключённых Android-пакетов (tun.exclude-package)
+          if (!masterConfig.tun) masterConfig.tun = {};
+          masterConfig.tun['exclude-package'] = customConfig[key];
+        } else if (key === 'rule-providers' && customConfig[key] && typeof customConfig[key] === 'object' && !Array.isArray(customConfig[key])) {
+          // Сливаем rule-providers по имени
+          if (!masterConfig['rule-providers'] || typeof masterConfig['rule-providers'] !== 'object') {
+            masterConfig['rule-providers'] = {};
+          }
+          for (const rpName of Object.keys(customConfig['rule-providers'])) {
+            const existing = masterConfig['rule-providers'][rpName];
+            if (existing && typeof existing === 'object') {
+              Object.assign(existing, customConfig['rule-providers'][rpName]);
+            } else {
+              masterConfig['rule-providers'][rpName] = customConfig['rule-providers'][rpName];
+            }
+          }
+        } else {
+          // Перезаписываем или добавляем другие ключи (external-ui, secret и т.д.)
+          masterConfig[key] = customConfig[key];
+        }
+      }
+      console.log(`[Info] Merged custom.yaml for user ${user}`);
+    }
+  } catch (e) {
+    console.error(`[Error] Failed to parse custom.yaml for user ${user}:`, e.message);
+  }
+  return masterConfig;
+}
+
 // Process all users in the data directory
-async function buildAll() {
+async function buildAll(overrideArg) {
   if (!fs.existsSync(DATA_DIR)) {
     console.log(`Directory ${DATA_DIR} does not exist. Created it.`);
     fs.mkdirSync(DATA_DIR, { recursive: true });
     return;
+  }
+
+  const rawArg = (overrideArg !== undefined ? overrideArg : (process.argv[2] || '')).toLowerCase().trim();
+  let mode = getStoredBuildMode();
+
+  if (rawArg === 'test') {
+    mode = 'test';
+    setStoredBuildMode('test');
+    console.log('[mode] Build mode switched to: TEST (test profile gets experimental config)');
+  } else if (rawArg === 'revert') {
+    mode = 'stable';
+    setStoredBuildMode('stable');
+    console.log('[mode] Build mode switched to: REVERT/STABLE (all profiles reverted to stable config)');
+  } else if (rawArg === 'promote') {
+    mode = 'promoted';
+    setStoredBuildMode('promoted');
+    console.log('[mode] Build mode switched to: PROMOTED (all profiles promoted to experimental config)');
+  } else {
+    console.log(`[mode] Running in active build mode: ${mode.toUpperCase()}`);
   }
 
   // Загружаем список RU-пакетов (legiz) один раз для всех юзеров
@@ -906,71 +1100,64 @@ async function buildAll() {
     fs.writeFileSync(ruPath, yaml.dump({ proxies: ruProxies }, { indent: 2, lineWidth: -1 }));
     fs.writeFileSync(foreignPath, yaml.dump({ proxies: foreignProxies }, { indent: 2, lineWidth: -1 }));
 
+    const isTest = isTestTarget(user, users);
+    let isUserExp = false;
+    if (mode === 'promoted') {
+      isUserExp = true;
+    } else if (mode === 'test') {
+      isUserExp = isTest;
+    }
+
     // Write Master Config
-    const masterConfig = generateConfig(
+    const rawMaster = generateConfig(
       user,
       `${BASE_URL}/providers/${token}_ru.yaml`,
       `${BASE_URL}/providers/${token}_foreign.yaml`,
-      ruPackages
+      ruPackages,
+      { experimental: isUserExp }
     );
-
-    // Вшиваем имя профиля прямо в YAML (поддерживается многими клиентами).
-    masterConfig['profile-name'] = process.env.PROFILE_NAME || 'Subscription Manager';
-
-    // --- ПОЛЬЗОВАТЕЛЬСКИЕ ПЕРЕОПРЕДЕЛЕНИЯ (custom.yaml) ---
-    const customPath = path.join(userDir, 'custom.yaml');
-    if (fs.existsSync(customPath)) {
-      try {
-        const customConfig = yaml.load(fs.readFileSync(customPath, 'utf8'));
-        if (customConfig && typeof customConfig === 'object') {
-          for (const key of Object.keys(customConfig)) {
-            if (key === 'proxy-groups' && Array.isArray(customConfig[key])) {
-              // Сливаем группы прокси по имени
-              for (const cg of customConfig[key]) {
-                const existingGroup = masterConfig['proxy-groups'].find(g => g.name === cg.name);
-                if (existingGroup) {
-                  Object.assign(existingGroup, cg);
-                } else {
-                  masterConfig['proxy-groups'].push(cg);
-                }
-              }
-            } else if (key === 'rules' && Array.isArray(customConfig[key])) {
-              // Добавляем кастомные правила в САМОЕ НАЧАЛО
-              masterConfig.rules = [...customConfig[key], ...masterConfig.rules];
-            } else if (key === 'tun-exclude-packages' && Array.isArray(customConfig[key])) {
-              // Override списка исключённых Android-пакетов (tun.exclude-package)
-              if (!masterConfig.tun) masterConfig.tun = {};
-              masterConfig.tun['exclude-package'] = customConfig[key];
-            } else if (key === 'rule-providers' && customConfig[key] && typeof customConfig[key] === 'object' && !Array.isArray(customConfig[key])) {
-              // Сливаем rule-providers по имени
-              if (!masterConfig['rule-providers'] || typeof masterConfig['rule-providers'] !== 'object') {
-                masterConfig['rule-providers'] = {};
-              }
-              for (const rpName of Object.keys(customConfig['rule-providers'])) {
-                const existing = masterConfig['rule-providers'][rpName];
-                if (existing && typeof existing === 'object') {
-                  Object.assign(existing, customConfig['rule-providers'][rpName]);
-                } else {
-                  masterConfig['rule-providers'][rpName] = customConfig['rule-providers'][rpName];
-                }
-              }
-            } else {
-              // Перезаписываем или добавляем другие ключи (external-ui, secret и т.д.)
-              masterConfig[key] = customConfig[key];
-            }
-          }
-          console.log(`[Info] Merged custom.yaml for user ${user}`);
-        }
-      } catch (e) {
-        console.error(`[Error] Failed to parse custom.yaml for user ${user}:`, e.message);
-      }
-    }
-    // ------------------------------------------------------
-
+    rawMaster['profile-name'] = process.env.PROFILE_NAME || 'Subscription Manager';
+    const masterConfig = applyCustomConfig(rawMaster, userDir, user);
     fs.writeFileSync(configPath, yaml.dump(masterConfig, { indent: 2, lineWidth: -1 }));
-    console.log(`[Success] Generated configs for user: ${user}`);
-    console.log(`  -> Subscription Link: ${BASE_URL}/configs/${token}`);
+
+    if (isTest) {
+      // Для тестера генерируем стабильную версию (${token}_stable) как подушку безопасности
+      const rawStable = generateConfig(
+        user,
+        `${BASE_URL}/providers/${token}_ru.yaml`,
+        `${BASE_URL}/providers/${token}_foreign.yaml`,
+        ruPackages,
+        { experimental: false }
+      );
+      rawStable['profile-name'] = `${process.env.PROFILE_NAME || 'Subscription Manager'} (Stable)`;
+      const stableConfig = applyCustomConfig(rawStable, userDir, user);
+      const stableConfigPath = path.join(CONFIGS_DIR, `${token}_stable`);
+      fs.writeFileSync(stableConfigPath, yaml.dump(stableConfig, { indent: 2, lineWidth: -1 }));
+
+      console.log(`[Success] Generated configs for TEST user: ${user}`);
+      console.log(`  -> Main Link:   ${BASE_URL}/configs/${token} [${isUserExp ? 'EXPERIMENTAL' : 'STABLE'}]`);
+      console.log(`  -> Stable Link: ${BASE_URL}/configs/${token}_stable [STABLE FALLBACK]`);
+    } else {
+      console.log(`[Success] Generated configs for user: ${user}`);
+      console.log(`  -> Subscription Link: ${BASE_URL}/configs/${token} [${isUserExp ? 'EXPERIMENTAL' : 'STABLE'}]`);
+    }
   }
 }
 
-buildAll().catch(console.error);
+module.exports = {
+  buildDns,
+  buildTun,
+  buildSniffer,
+  buildProxyProviders,
+  buildProxyGroups,
+  buildRuleProviders,
+  buildRules,
+  generateConfig,
+  getStoredBuildMode,
+  setStoredBuildMode,
+  buildAll
+};
+
+if (require.main === module) {
+  buildAll().catch(console.error);
+}

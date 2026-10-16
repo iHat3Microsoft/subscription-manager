@@ -483,7 +483,36 @@ rule-provider с `PROCESS-NAME` для Windows/Linux/macOS exe
 
 ---
 
-## 2026-10-06 — Аудит архитектуры, версионирование ключей и оптимизация конфига
+---
+
+## 2026-10-16 — Реализовано: DNS дедлок-фри, порядок правил, стек mips и схема тестирования
+
+- [x] **Устранение DNS-дедлока и DoH routing:**
+  - `nameserver` использует прямые IP (`1.1.1.1`, `8.8.8.8`) с принудительной маршрутизацией в прокси: `#🌍 Иностранные серверы`.
+  - Добавлен `proxy-server-nameserver` с российскими DoH/DoT (`common.dot.dns.yandex.net`, `tls://77.88.8.8`).
+  - `default-nameserver` очищен от hostname-based DoH, оставлены надежные IP (`77.88.8.8`, `94.140.14.140`).
+  - Включен `cache-algorithm: arc` и `respect-rules: true`, удален невалидный `prefer-ipv4`.
+- [x] **Починка rule-providers:**
+  - `ru-blocked` переведен в `behavior: domain, format: text, path: ./rule-sets/ru-blocked.txt`.
+  - `geosite-tiktok` переведен в бинарный `format: mrs`.
+  - Удален inline-провайдер `quic` и правило `- RULE-SET,quic,REJECT-DROP` (разблокирован QUIC / HTTP/3).
+  - В `sniffer.sniff` добавлен перехват `QUIC` (443, 8443).
+- [x] **Оптимизация правил и no-resolve:**
+  - `RULE-SET,my-rules` поднят на 2-ю позицию для мгновенного ручного переопределения.
+  - `ru-bundle` и `ru-blocked` установлены **выше** `DOMAIN-SUFFIX,ru,DIRECT`.
+  - `DOMAIN-SUFFIX,xn--p1ai,DIRECT` вместо кириллицы `.рф`.
+  - Очищены ключевые слова AI (`grok.com`, `x.ai`, `copilot.microsoft.com`).
+  - `geosite-meta` перенесен в `👥 Facebook`.
+  - Все IP-правила (`discord_voiceips`, `telegram-ips`, `facebook-ips`, `IP-ASN,32934`, `google-geoip`, `GEOIP,RU`, `rknasnblock`) перенесены в конец перед `MATCH` строго с флагом `no-resolve`.
+- [x] **Стек `mips` и IPv6 Blackhole через TUN:**
+  - В experimental/promote включен `stack: mips`.
+  - В корне `ipv6: true`, в `dns` `ipv6: false`, в `tun` добавлен `inet6-address: [fdfe:dcba:9876::1/126]`, первым правилом стоит `IP-CIDR6,::/0,REJECT-DROP,no-resolve`.
+- [x] **Балансировка `sticky-sessions`:**
+  - Добавлена группа `⚖️ Балансировка (Иностранные)` (тип `load-balance`, стратегия `sticky-sessions`) в `proxy-groups`.
+- [x] **Схема безопасного тестирования (buildvpn test / revert / promote):**
+  - Поддержка аргументов `test`, `revert`, `promote` через состояние в `data/.build-mode.json`.
+  - Для тестера (`Me`) генерируются параллельно `${token}` (тестовый конфиг) и `${token}_stable` (стабильный резерв) без клонирования папок в `data/`.
+  - Все обычные пользователи получают проверенный стабильный конфиг.
 
 ### [CRITICAL-1] Версионирование и отслеживание ключей в Git
 - **Проблема:** Ключи пользователей (`data/` и `out_keys/`) не версионируются в репозитории (в `.gitignore`). При случайной перезаписи имени файла или сбое скрипта `sub.sh`/`sub_vless.sh` конфиг перетирается.
