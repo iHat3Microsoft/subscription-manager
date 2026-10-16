@@ -82,26 +82,33 @@ async function testProxyGroups() {
 }
 
 async function testRuleProviders() {
-  const providers = build.buildRuleProviders();
-  assert.strictEqual(providers.quic, undefined, 'inline quic provider must be removed');
-  assert.ok(providers.oisd_small, 'oisd_small must be present');
-  assert.strictEqual(providers.oisd_big, undefined, 'oisd_big must be replaced');
+  const defaultProviders = build.buildRuleProviders();
+  assert.strictEqual(defaultProviders.quic, undefined, 'inline quic provider must be removed');
+  assert.ok(defaultProviders.oisd_small, 'default must use oisd_small');
+  assert.strictEqual(defaultProviders.oisd_big, undefined);
 
-  assert.strictEqual(providers['ru-blocked'].behavior, 'domain');
-  assert.strictEqual(providers['ru-blocked'].format, 'text');
-  assert.strictEqual(providers['ru-blocked'].path, './rule-sets/ru-blocked.txt');
+  const bigProviders = build.buildRuleProviders({ adblock: 'big' });
+  assert.ok(bigProviders.oisd_big, 'adblock: big must use oisd_big');
+  assert.strictEqual(bigProviders.oisd_small, undefined);
 
-  assert.strictEqual(providers['geosite-tiktok'].format, 'mrs');
-  assert.strictEqual(providers['geosite-tiktok'].path, './rule-sets/tiktok.mrs');
+  assert.strictEqual(defaultProviders['ru-blocked'].behavior, 'domain');
+  assert.strictEqual(defaultProviders['ru-blocked'].format, 'text');
+  assert.strictEqual(defaultProviders['ru-blocked'].path, './rule-sets/ru-blocked.txt');
 
-  console.log('ok - Rule providers verified (ru-blocked text format, geosite-tiktok mrs)');
+  assert.strictEqual(defaultProviders['geosite-tiktok'].format, 'mrs');
+  assert.strictEqual(defaultProviders['geosite-tiktok'].path, './rule-sets/tiktok.mrs');
+
+  console.log('ok - Rule providers verified (default oisd_small, opt-in oisd_big, ru-blocked text format, geosite-tiktok mrs)');
 }
 
 async function testRules() {
   const stableRules = build.buildRules({ experimental: false });
   assert.strictEqual(stableRules.some(r => r.startsWith('IP-CIDR6,::/0')), false);
   assert.strictEqual(stableRules.some(r => r.includes('quic')), false);
-  assert.ok(stableRules.includes('RULE-SET,oisd_small,🚫 Реклама'), 'oisd_small must be used in rules');
+  assert.ok(stableRules.includes('RULE-SET,oisd_small,🚫 Реклама'), 'default must use oisd_small');
+
+  const bigRules = build.buildRules({ adblock: 'big' });
+  assert.ok(bigRules.includes('RULE-SET,oisd_big,🚫 Реклама'), 'adblock: big must use oisd_big');
 
   const expRules = build.buildRules({ experimental: true });
   assert.strictEqual(expRules[0], 'IP-CIDR6,::/0,REJECT-DROP,no-resolve');
@@ -173,6 +180,33 @@ async function testBuildMode() {
   console.log('ok - Build mode state persistence verified');
 }
 
+async function testIosDetection() {
+  const tmpDir = path.join(__dirname, 'tmp_ios_test');
+  fs.mkdirSync(tmpDir, { recursive: true });
+  try {
+    assert.strictEqual(build.isIosUser(tmpDir), false);
+
+    fs.writeFileSync(path.join(tmpDir, 'ios'), '');
+    assert.strictEqual(build.isIosUser(tmpDir), true);
+    fs.unlinkSync(path.join(tmpDir, 'ios'));
+
+    fs.writeFileSync(path.join(tmpDir, 'is_ios'), '');
+    assert.strictEqual(build.isIosUser(tmpDir), true);
+    fs.unlinkSync(path.join(tmpDir, 'is_ios'));
+
+    fs.writeFileSync(path.join(tmpDir, 'isIOS'), '');
+    assert.strictEqual(build.isIosUser(tmpDir), true);
+    fs.unlinkSync(path.join(tmpDir, 'isIOS'));
+
+    fs.writeFileSync(path.join(tmpDir, 'custom.yaml'), 'ios: true\n');
+    assert.strictEqual(build.isIosUser(tmpDir), true);
+    assert.strictEqual(build.getAdblockPreference(tmpDir, true), 'small');
+  } finally {
+    fs.rmSync(tmpDir, { recursive: true, force: true });
+  }
+  console.log('ok - iOS user detection verified');
+}
+
 async function main() {
   await testDns();
   await testTun();
@@ -182,6 +216,7 @@ async function main() {
   await testRules();
   await testGenerateConfig();
   await testBuildMode();
+  await testIosDetection();
   console.log('build: all assertions passed');
 }
 

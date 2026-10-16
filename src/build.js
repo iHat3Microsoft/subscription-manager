@@ -534,16 +534,32 @@ function buildProxyGroups(options = {}) {
   return groups;
 }
 
-function buildRuleProviders() {
+function buildRuleProviders(options = {}) {
+  const isBig = options.adblock === 'big';
+  const adblockProvider = isBig
+    ? {
+        oisd_big: {
+          type: 'http',
+          behavior: 'domain',
+          format: 'mrs',
+          url: 'https://github.com/legiz-ru/mihomo-rule-sets/raw/main/oisd/big.mrs',
+          path: './rule-sets/oisd_big.mrs',
+          interval: 86400
+        }
+      }
+    : {
+        oisd_small: {
+          type: 'http',
+          behavior: 'domain',
+          format: 'mrs',
+          url: 'https://github.com/legiz-ru/mihomo-rule-sets/raw/main/oisd/small.mrs',
+          path: './rule-sets/oisd_small.mrs',
+          interval: 86400
+        }
+      };
+
   return {
-    oisd_small: {
-      type: 'http',
-      behavior: 'domain',
-      format: 'mrs',
-      url: 'https://github.com/legiz-ru/mihomo-rule-sets/raw/main/oisd/small.mrs',
-      path: './rule-sets/oisd_small.mrs',
-      interval: 86400
-    },
+    ...adblockProvider,
     discord_voiceips: {
       behavior: 'ipcidr',
       type: 'http',
@@ -780,6 +796,10 @@ function buildRuleProviders() {
 
 function buildRules(options = {}) {
   const isExp = Boolean(options.experimental);
+  const isBig = options.adblock === 'big';
+  const adblockRule = isBig
+    ? 'RULE-SET,oisd_big,🚫 Реклама'
+    : 'RULE-SET,oisd_small,🚫 Реклама';
   const rules = [];
 
   if (isExp) {
@@ -806,7 +826,7 @@ function buildRules(options = {}) {
     'RULE-SET,ru_apps,DIRECT',
 
     // 4. Реклама
-    'RULE-SET,oisd_small,🚫 Реклама',
+    adblockRule,
 
     // 4. Целевые сервисы (домены и процессы)
     'RULE-SET,geosite-youtube,▶️ YouTube',
@@ -870,7 +890,7 @@ function generateConfig(userName, ruProviderUrl, foreignProviderUrl, excludePack
     sniffer: buildSniffer(),
     'proxy-providers': buildProxyProviders(ruProviderUrl, foreignProviderUrl),
     'proxy-groups': buildProxyGroups(options),
-    'rule-providers': buildRuleProviders(),
+    'rule-providers': buildRuleProviders(options),
     rules: buildRules(options)
   };
 }
@@ -926,6 +946,40 @@ function isTestTarget(user, allUsers) {
     return true;
   }
   return false;
+}
+
+function isIosUser(userDir) {
+  const customPath = path.join(userDir, 'custom.yaml');
+  if (fs.existsSync(customPath)) {
+    try {
+      const cfg = yaml.load(fs.readFileSync(customPath, 'utf8'));
+      if (cfg && (cfg.ios === true || cfg.is_ios === true || cfg.adblock === 'small')) {
+        return true;
+      }
+    } catch {
+      // ignore
+    }
+  }
+  const markers = ['ios', 'is_ios', 'isIOS', 'isIOS=1', 'ios.txt', '.ios'];
+  return markers.some(m => fs.existsSync(path.join(userDir, m)));
+}
+
+const DEFAULT_ADBLOCK = process.env.DEFAULT_ADBLOCK || 'small';
+
+function getAdblockPreference(userDir, isIos) {
+  if (isIos) return 'small';
+  const customPath = path.join(userDir, 'custom.yaml');
+  if (fs.existsSync(customPath)) {
+    try {
+      const cfg = yaml.load(fs.readFileSync(customPath, 'utf8'));
+      if (cfg && cfg.adblock) return String(cfg.adblock).toLowerCase();
+    } catch {
+      // ignore
+    }
+  }
+  const markers = ['big', 'oisd_big'];
+  if (markers.some(m => fs.existsSync(path.join(userDir, m)))) return 'big';
+  return DEFAULT_ADBLOCK;
 }
 
 function applyCustomConfig(baseConfig, userDir, user) {
@@ -1130,13 +1184,18 @@ async function buildAll(overrideArg) {
       isUserExp = isTest;
     }
 
+    const isIos = isIosUser(userDir);
+    const userPackages = isIos ? [] : ruPackages;
+    const adblockMode = getAdblockPreference(userDir, isIos);
+    const userOptions = { experimental: isUserExp, ios: isIos, adblock: adblockMode };
+
     // Write Master Config
     const rawMaster = generateConfig(
       user,
       `${BASE_URL}/providers/${token}_ru.yaml`,
       `${BASE_URL}/providers/${token}_foreign.yaml`,
-      ruPackages,
-      { experimental: isUserExp }
+      userPackages,
+      userOptions
     );
     rawMaster['profile-name'] = process.env.PROFILE_NAME || 'Subscription Manager';
     const masterConfig = applyCustomConfig(rawMaster, userDir, user);
@@ -1148,19 +1207,19 @@ async function buildAll(overrideArg) {
         user,
         `${BASE_URL}/providers/${token}_ru.yaml`,
         `${BASE_URL}/providers/${token}_foreign.yaml`,
-        ruPackages,
-        { experimental: false }
+        userPackages,
+        { experimental: false, ios: isIos, adblock: adblockMode }
       );
       rawStable['profile-name'] = `${process.env.PROFILE_NAME || 'Subscription Manager'} (Stable)`;
       const stableConfig = applyCustomConfig(rawStable, userDir, user);
       const stableConfigPath = path.join(CONFIGS_DIR, `${token}_stable`);
       fs.writeFileSync(stableConfigPath, yaml.dump(stableConfig, { indent: 2, lineWidth: -1 }));
 
-      console.log(`[Success] Generated configs for TEST user: ${user}`);
+      console.log(`[Success] Generated configs for TEST user: ${user}${isIos ? ' [iOS]' : ''} [adblock: ${adblockMode}]`);
       console.log(`  -> Main Link:   ${BASE_URL}/configs/${token} [${isUserExp ? 'EXPERIMENTAL' : 'STABLE'}]`);
       console.log(`  -> Stable Link: ${BASE_URL}/configs/${token}_stable [STABLE FALLBACK]`);
     } else {
-      console.log(`[Success] Generated configs for user: ${user}`);
+      console.log(`[Success] Generated configs for user: ${user}${isIos ? ' [iOS]' : ''} [adblock: ${adblockMode}]`);
       console.log(`  -> Subscription Link: ${BASE_URL}/configs/${token} [${isUserExp ? 'EXPERIMENTAL' : 'STABLE'}]`);
     }
   }
@@ -1177,6 +1236,8 @@ module.exports = {
   generateConfig,
   getStoredBuildMode,
   setStoredBuildMode,
+  isIosUser,
+  getAdblockPreference,
   buildAll
 };
 
