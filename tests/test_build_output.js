@@ -124,6 +124,7 @@ async function testRules() {
   assert.strictEqual(stableRules.find(r => r.includes('rknasnblock')), 'RULE-SET,rknasnblock,🚫 Заблокированные сайты (RU)', 'rknasnblock must resolve unclassified CDN IPs');
   assert.ok(stableRules.find(r => r.startsWith('GEOIP,RU')).endsWith('no-resolve') || stableRules.find(r => r === 'GEOIP,RU,DIRECT'), 'GEOIP,RU must be near bottom');
   assert.strictEqual(matchIdx, stableRules.length - 1, 'MATCH must be the final rule');
+  assert.strictEqual(stableRules.some(r => r.includes('IP-ASN')), false, 'IP-ASN must be removed to avoid downloading GeoASN.dat');
 
   // Meta & AI rules
   const instaRule = stableRules.find(r => r.includes('📸 Instagram & Threads') && r.startsWith('OR,'));

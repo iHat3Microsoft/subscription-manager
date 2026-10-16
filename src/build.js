@@ -843,7 +843,6 @@ function buildRules(options = {}) {
     'RULE-SET,discord_voiceips,💬 Discord,no-resolve',
     'RULE-SET,telegram-ips,➤ Telegram,no-resolve',
     'RULE-SET,facebook-ips,📞 WhatsApp,no-resolve',
-    'IP-ASN,32934,📸 Instagram & Threads,no-resolve',
     'RULE-SET,google-geoip,🔎 Google,no-resolve',
     'GEOIP,RU,DIRECT',
     'IP-CIDR,151.101.0.0/16,🚫 Заблокированные сайты (RU)',
