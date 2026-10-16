@@ -796,15 +796,17 @@ function buildRules(options = {}) {
     'IP-CIDR,100.64.0.0/10,DIRECT,no-resolve',
     'AND,((NETWORK,tcp),(DST-PORT,22)),DIRECT',
     'PROCESS-NAME,ssh,DIRECT',
+
+    // 2. Пользовательские кастомные правила (наивысший приоритет!)
+    'RULE-SET,my-rules,📋 My Rules',
+
+    // 3. Торренты, игры и локальные приложения
     'RULE-SET,torrent-clients,DIRECT',
     'PROCESS-NAME-REGEX,(?i).*torrent.*,DIRECT',
     'RULE-SET,games-direct,🎮 Игры (DIRECT)',
     'RULE-SET,ru_apps,DIRECT',
 
-    // 2. Пользовательские кастомные правила (самый высокий приоритет!)
-    'RULE-SET,my-rules,📋 My Rules',
-
-    // 3. Реклама
+    // 4. Реклама
     'RULE-SET,oisd_big,🚫 Реклама',
 
     // 4. Целевые сервисы (домены и процессы)
@@ -844,6 +846,7 @@ function buildRules(options = {}) {
     'IP-ASN,32934,📸 Instagram & Threads,no-resolve',
     'RULE-SET,google-geoip,🔎 Google,no-resolve',
     'GEOIP,RU,DIRECT',
+    'IP-CIDR,151.101.0.0/16,🚫 Заблокированные сайты (RU)',
     'RULE-SET,rknasnblock,🚫 Заблокированные сайты (RU)',
 
     // 8. Финальный фоллбэк

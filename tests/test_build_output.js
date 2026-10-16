@@ -111,6 +111,7 @@ async function testRules() {
   const rknAsnIdx = stableRules.findIndex(r => r.includes('rknasnblock'));
   const matchIdx = stableRules.findIndex(r => r.startsWith('MATCH'));
 
+  assert.ok(myRulesIdx < stableRules.findIndex(r => r.includes('games-direct')), 'my-rules must be above games-direct');
   assert.ok(myRulesIdx < ruBundleIdx, 'my-rules must be higher priority than ru-bundle');
   assert.ok(ruBundleIdx < ruDirectIdx, 'ru-bundle must be checked BEFORE DOMAIN-SUFFIX,ru,DIRECT');
   assert.ok(ruBlockedIdx < ruDirectIdx, 'ru-blocked must be checked BEFORE DOMAIN-SUFFIX,ru,DIRECT');
@@ -119,6 +120,7 @@ async function testRules() {
 
   // IP rules at the bottom
   assert.ok(rknAsnIdx > ruDirectIdx, 'rknasnblock must be below domain rules');
+  assert.ok(stableRules.includes('IP-CIDR,151.101.0.0/16,🚫 Заблокированные сайты (RU)'), 'Fastly CDN rule must be present');
   assert.strictEqual(stableRules.find(r => r.includes('rknasnblock')), 'RULE-SET,rknasnblock,🚫 Заблокированные сайты (RU)', 'rknasnblock must resolve unclassified CDN IPs');
   assert.ok(stableRules.find(r => r.startsWith('GEOIP,RU')).endsWith('no-resolve') || stableRules.find(r => r === 'GEOIP,RU,DIRECT'), 'GEOIP,RU must be near bottom');
   assert.strictEqual(matchIdx, stableRules.length - 1, 'MATCH must be the final rule');
