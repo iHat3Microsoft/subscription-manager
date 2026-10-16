@@ -86,3 +86,61 @@ but was never pushed to GitLab. Some changes may be lost. TODO:
 - [ ] Consider: `gen.sh` uses python3 inline scripts — could be pure bash/awk
 - [ ] Consider: `sub_vless.sh` at 488 lines could benefit from splitting
 - [ ] `Caddyfile` has hardcoded domain — could use env var or Caddy snippet
+
+---
+
+## Session notes — Anti-Censorship & Architecture Overhaul, 2026-10-16
+
+### 1. Контекст проекта и цели
+- **Главная цель:** Цензуроустойчивый VPN для пользователей в РФ со сплит-туннелированием по принципу «включил и забыл». Максимальная производительность, комфорт, отсутствие необходимости включать/выключать VPN для банков и российских сайтов.
+- **Инфраструктура:** VPS с протоколами Hysteria 2 (основной скоростной UDP), AmneziaWG 3.1 (L3 UDP туннель) и VLESS Reality TCP (аварийный резерв при блокировке UDP). Раздача подписок через Caddy (`public/configs/<TOKEN>`).
+
+### 2. Что важно знать новому агенту в первую очередь
+
+#### А. Почему конфиг строится через JS-функции в `src/build.js`, а не из YAML-шаблона:
+- Текстовый `replace` / string-injection в YAML ломает отступы при динамических списках (530+ Android пакетов, переменное число нод).
+- `yaml.load()` при парсинге шаблона сносит все комментарии.
+- Чистые JS-функции (`buildDns()`, `buildTun()`, `buildRules()`) строго типизированы, тестируются через `node --check` и `npm test`, поддерживают per-user `custom.yaml` deep merge.
+
+#### Б. Схема безопасного тестирования (`buildvpn test / revert / promote`):
+- Состояние режима хранится в `data/.build-mode.json` (`stable` | `test` | `promoted`).
+- **`buildvpn test` (или `node src/build.js test`):**
+  - Пересобирает **только** профиль тестера (`TEST_USER`, по умолчанию `Me`) — не трогает и не перезаписывает 20+ других пользователей.
+  - Для `Me` генерирует основной файл `${token}` с новыми экспериментальными фичами (`stack: mips`, IPv6 blackhole, `sticky-sessions` балансировка по умолчанию).
+  - Для него же генерирует аварийный файл `${token}_stable` с проверенными стабильными параметрами.
+  - Физическая папка `data/Me` **не клонируется**, сохраняя единый источник ключей.
+- **`buildvpn revert`:** мгновенный откат всех профилей на стабильный конфиг.
+- **`buildvpn promote`:** раскатка проверенных экспериментальных фичей в постоянный стандарт для всех пользователей.
+
+#### В. Иерархия сортировки нод в `sortProxies`:
+1. **Ярус скорости:** Ноды с `10G` / `10гбит` всегда идут первыми.
+2. **Протокол внутри яруса:** `Hysteria 2` (вес 30) $\rightarrow$ `WireGuard/AWG` (вес 20) $\rightarrow$ `VLESS` (вес 10).
+3. **Имя:** по алфавиту.
+*Результат:* Fallback-группы всегда держат трафик на быстрых UDP-протоколах (Hysteria 2 / AWG), а VLESS висит в самом конце как резерв на случай глушения UDP.
+
+#### Г. Архитектура DNS (Решение дедлоков и ловушек `respect-rules`):
+- `nameserver`: использует IP-based DoH (`https://1.1.1.1/dns-query#🌍 Иностранные серверы` и `https://8.8.8.8/dns-query#🌍 Иностранные серверы`). Суффикс `#<group>` гарантирует, что DoH идёт через прокси и не утекает в DIRECT из-за `google-geoip` или `MATCH`.
+- `proxy-server-nameserver`: использует Яндекс DoH/DoT (`common.dot.dns.yandex.net`, `tls://77.88.8.8`) с суффиксом `#disable-ipv6=true` для первичного резолва доменов VPS без дедлока.
+- `direct-nameserver`: Яндекс с `#disable-ipv6=true` — блокирует AAAA-запросы для прямого выхода, исключая ошибки `network is unreachable` в логах.
+- `fake-ip`: обязателен. 0 мс задержка старта соединений, DNS заблокированных сайтов резолвится удаленно на европейской ноде без подмен от ТСПУ.
+
+#### Д. Тонкости порядка правил в `rules`:
+1. Локальные IPv4 подсети с `no-resolve` и SSH:22.
+2. `RULE-SET,my-rules,📋 My Rules` — на самом верху (выше игр и шаблонных приложений) для моментальных ручных разблокировок.
+3. Торренты, игры, десктопные `ru_apps`.
+4. Реклама: `RULE-SET,oisd_small` (~490 KB, блокирует рекламу Xiaomi/MIUI и мобильных баннеров, не ломая банки и укладываясь в 50 МБ лимит iOS).
+5. Целевые сервисы:
+   - `🤖 AI (Нейронки)`: всегда на `♻️ Автовыбор (Иностранные)` (fallback), чтобы не флапать IP на ChatGPT/Claude.
+   - `▶️ YouTube` & `💬 Discord`: на `♻️ Резерв (RU -> EU)` (держит RU-ноду для отсутствия рекламы).
+   - `🔎 Google`: `DIRECT` $\rightarrow$ `♻️ Автовыбор` $\rightarrow$ `🌍 Иностранные`.
+6. Списки блокировок РКН (`ru-bundle`, `ru-blocked` в формате `text`) **строго выше** `DOMAIN-SUFFIX,ru,DIRECT`, иначе заблокированные `.ru`-сайты улетают в DIRECT.
+7. Прямой RU-трафик: `ru`, `xn--p1ai` (Punycode, не кириллица!), `su`.
+8. Обход блокировки CDN Fastly: `IP-CIDR,151.101.0.0/16,🚫 Заблокированные сайты (RU)` спасает Flathub, Mozilla Sync, OpenStreetMap, Reddit от таймаутов.
+9. В самом низу: `GEOIP,RU,DIRECT` и `RULE-SET,rknasnblock,🚫 Заблокированные сайты (RU)` **без `no-resolve`** (чтобы неизвестные домены резолвились и проверялись по IP-базам блокировок).
+10. `IP-ASN` удален целиком — вся Meta покрыта `facebook-ips.mrs`, что экономит ~20 МБ RAM (`GeoASN.dat` не загружается).
+11. Завершающее: `MATCH,🌐 Остальной трафик (MATCH)`.
+
+#### Е. Специфика версий Mihomo:
+- `global-client-fingerprint` в Mihomo v1.19.x удален из корня конфига (вызывает `3008error`). `client-fingerprint` задается внутри настроек конкретных прокси-узлов.
+- `stack: mips` (Mihomo IP Stack) — валидный и рекомендуемый userspace-стек Mihomo (не путать с архитектурой CPU).
+- `strategy: sticky-sessions` автоматически склеивает поддомены по eTLD+1 и кэширует сессию на 10 минут.
