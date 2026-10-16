@@ -336,10 +336,9 @@ function buildProxyProviders(ruProviderUrl, foreignProviderUrl) {
 
 function buildProxyGroups(options = {}) {
   const isExp = Boolean(options.experimental);
-  const foreignProxies = ['♻️ Автовыбор (Иностранные)'];
-  if (isExp) {
-    foreignProxies.push('⚖️ Балансировка (Иностранные)');
-  }
+  const foreignProxies = isExp
+    ? ['⚖️ Балансировка (Иностранные)', '♻️ Автовыбор (Иностранные)']
+    : ['♻️ Автовыбор (Иностранные)'];
 
   const groups = [
     {
@@ -1021,7 +1020,18 @@ async function buildAll(overrideArg) {
 
   const users = fs.readdirSync(DATA_DIR).filter(f => fs.statSync(path.join(DATA_DIR, f)).isDirectory());
 
-  for (const user of users) {
+  let usersToProcess = users;
+  if (rawArg === 'test') {
+    const targets = users.filter(u => isTestTarget(u, users));
+    if (targets.length > 0) {
+      usersToProcess = targets;
+      console.log(`[info] Test mode: rebuilding ONLY test user(s): ${usersToProcess.join(', ')}`);
+    } else {
+      console.warn(`[warn] test target '${TEST_USER}' not found in data/. Available: ${users.join(', ')}`);
+    }
+  }
+
+  for (const user of usersToProcess) {
     const userDir = path.join(DATA_DIR, user);
     const ruDir = path.join(userDir, 'ru');
     const foreignDir = path.join(userDir, 'foreign');

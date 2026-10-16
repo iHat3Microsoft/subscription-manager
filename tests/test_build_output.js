@@ -70,6 +70,7 @@ async function testProxyGroups() {
 
   const expForeign = expGroups.find(g => g.name === '🌍 Иностранные серверы');
   assert.ok(expForeign.proxies.includes('⚖️ Балансировка (Иностранные)'));
+  assert.strictEqual(expForeign.proxies[0], '⚖️ Балансировка (Иностранные)', 'Balancing must be default in experimental mode');
 
   const aiGroup = stableGroups.find(g => g.name === '🤖 AI (Нейронки)');
   assert.deepStrictEqual(aiGroup.proxies, ['♻️ Автовыбор (Иностранные)', '🌍 Иностранные серверы']);
