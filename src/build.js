@@ -225,8 +225,8 @@ function buildDns() {
       '77.88.8.8#disable-ipv6=true'
     ],
     nameserver: [
-      'https://1.1.1.1/dns-query#🌍 Сервер',
-      'https://8.8.8.8/dns-query#🌍 Сервер'
+      'https://1.1.1.1/dns-query#🌍 Зарубежный сервер',
+      'https://8.8.8.8/dns-query#🌍 Зарубежный сервер'
     ],
     'nameserver-policy': {
       'geosite:category-ru': [
@@ -372,12 +372,6 @@ function buildProxyGroups(options = {}) {
       timeout: 5000,
       'max-failed-times': 3,
       use: ['ru_servers', 'foreign_servers']
-    },
-    {
-      name: 'Без VPN (напрямую)',
-      type: 'select',
-      hidden: true,
-      proxies: ['DIRECT']
     }
   ];
 
@@ -398,7 +392,7 @@ function buildProxyGroups(options = {}) {
 
   groups.push(
     {
-      name: '🌍 Сервер',
+      name: '🌍 Зарубежный сервер',
       type: 'select',
       icon: 'https://cdn.jsdelivr.net/gh/Koolson/Qure@master/IconSet/Color/Global.png',
       proxies: foreignProxies,
@@ -408,42 +402,41 @@ function buildProxyGroups(options = {}) {
       name: '🌐 Остальной трафик',
       type: 'select',
       icon: 'https://cdn.jsdelivr.net/gh/Koolson/Qure@master/IconSet/Color/Auto.png',
-      proxies: ['Без VPN (напрямую)', '🌍 Сервер'],
+      proxies: ['Без VPN (напрямую)', '🌍 Зарубежный сервер'],
       use: ['foreign_servers']
     },
     {
       name: '▶️ YouTube',
       type: 'select',
       icon: 'https://cdn.jsdelivr.net/gh/Koolson/Qure@master/IconSet/Color/YouTube.png',
-      proxies: ['♻️ Сначала РФ', '🌍 Сервер', 'Без VPN (напрямую)'],
+      proxies: ['♻️ Сначала РФ', '🌍 Зарубежный сервер', 'Без VPN (напрямую)'],
       use: ['ru_servers', 'foreign_servers']
     },
     {
       name: '🔎 Google',
       type: 'select',
       icon: 'https://cdn.jsdelivr.net/gh/Koolson/Qure@master/IconSet/Color/Google_Search.png',
-      proxies: ['Без VPN (напрямую)', '♻️ Автовыбор', '🌍 Сервер'],
+      proxies: ['Без VPN (напрямую)', '♻️ Автовыбор', '🌍 Зарубежный сервер'],
       use: ['foreign_servers']
     },
     {
       name: '🚫 Реклама',
       type: 'select',
       icon: 'https://raw.githubusercontent.com/remnawave/templates/refs/heads/main/icons/AdBlock.png',
-      proxies: ['REJECT', 'Без VPN (напрямую)', '🌍 Сервер'],
-      use: ['foreign_servers']
+      proxies: ['Блокировать', 'Без VPN (напрямую)', '🌍 Зарубежный сервер']
     },
     {
       name: '💬 Discord',
       type: 'select',
       icon: 'https://raw.githubusercontent.com/remnawave/templates/refs/heads/main/icons/Discord.png',
-      proxies: ['♻️ Сначала РФ', '🌍 Сервер', 'Без VPN (напрямую)'],
+      proxies: ['♻️ Сначала РФ', '🌍 Зарубежный сервер', 'Без VPN (напрямую)'],
       use: ['ru_servers', 'foreign_servers']
     },
     {
       name: '🎵 Spotify / SoundCloud',
       type: 'select',
       icon: 'https://cdn.jsdelivr.net/gh/Koolson/Qure@master/IconSet/Color/Spotify.png',
-      proxies: ['♻️ Сначала РФ', '🌍 Сервер', 'Без VPN (напрямую)'],
+      proxies: ['♻️ Сначала РФ', '🌍 Зарубежный сервер', 'Без VPN (напрямую)'],
       use: ['ru_servers', 'foreign_servers']
     },
     {
@@ -451,7 +444,7 @@ function buildProxyGroups(options = {}) {
       type: 'select',
       hidden: true,
       icon: 'https://raw.githubusercontent.com/remnawave/templates/refs/heads/main/icons/Blocked.png',
-      proxies: ['🌍 Сервер', 'Без VPN (напрямую)'],
+      proxies: ['🌍 Зарубежный сервер', 'Без VPN (напрямую)'],
       use: ['foreign_servers']
     },
     {
@@ -459,7 +452,7 @@ function buildProxyGroups(options = {}) {
       type: 'select',
       hidden: true,
       icon: 'https://cdn.jsdelivr.net/gh/Koolson/Qure@master/IconSet/Color/Pornhub.png',
-      proxies: ['🌍 Сервер', 'Без VPN (напрямую)'],
+      proxies: ['🌍 Зарубежный сервер', 'Без VPN (напрямую)'],
       use: ['foreign_servers']
     },
     {
@@ -467,7 +460,7 @@ function buildProxyGroups(options = {}) {
       type: 'select',
       hidden: true,
       icon: 'https://cdn.jsdelivr.net/gh/Koolson/Qure@master/IconSet/Color/WhatsApp.png',
-      proxies: ['🌍 Сервер', 'Без VPN (напрямую)'],
+      proxies: ['🌍 Зарубежный сервер', 'Без VPN (напрямую)'],
       use: ['foreign_servers']
     },
     {
@@ -475,7 +468,7 @@ function buildProxyGroups(options = {}) {
       type: 'select',
       hidden: true,
       icon: 'https://cdn.jsdelivr.net/gh/Koolson/Qure@master/IconSet/Color/Instagram.png',
-      proxies: ['🌍 Сервер'],
+      proxies: ['🌍 Зарубежный сервер'],
       use: ['foreign_servers']
     },
     {
@@ -483,7 +476,7 @@ function buildProxyGroups(options = {}) {
       type: 'select',
       hidden: true,
       icon: 'https://cdn.jsdelivr.net/gh/Koolson/Qure@master/IconSet/Color/Telegram.png',
-      proxies: ['🌍 Сервер', 'Без VPN (напрямую)'],
+      proxies: ['🌍 Зарубежный сервер', 'Без VPN (напрямую)'],
       use: ['foreign_servers']
     },
     {
@@ -491,7 +484,7 @@ function buildProxyGroups(options = {}) {
       type: 'select',
       hidden: true,
       icon: 'https://cdn.jsdelivr.net/gh/Koolson/Qure@master/IconSet/Color/TikTok.png',
-      proxies: ['🌍 Сервер'],
+      proxies: ['🌍 Зарубежный сервер'],
       use: ['foreign_servers']
     },
     {
@@ -499,7 +492,7 @@ function buildProxyGroups(options = {}) {
       type: 'select',
       hidden: true,
       icon: 'https://cdn.jsdelivr.net/gh/Koolson/Qure@master/IconSet/Color/Spark.png',
-      proxies: ['♻️ Автовыбор', '🌍 Сервер'],
+      proxies: ['♻️ Автовыбор', '🌍 Зарубежный сервер'],
       use: ['foreign_servers']
     },
     {
@@ -507,7 +500,7 @@ function buildProxyGroups(options = {}) {
       type: 'select',
       hidden: true,
       icon: 'https://cdn.jsdelivr.net/gh/Koolson/Qure@master/IconSet/Color/Game.png',
-      proxies: ['🌍 Сервер'],
+      proxies: ['🌍 Зарубежный сервер'],
       use: ['foreign_servers']
     },
     {
@@ -515,7 +508,7 @@ function buildProxyGroups(options = {}) {
       type: 'select',
       hidden: true,
       icon: 'https://cdn.jsdelivr.net/gh/Koolson/Qure@master/IconSet/Color/Facebook.png',
-      proxies: ['🌍 Сервер'],
+      proxies: ['🌍 Зарубежный сервер'],
       use: ['foreign_servers']
     },
     {
@@ -531,14 +524,14 @@ function buildProxyGroups(options = {}) {
       type: 'select',
       hidden: true,
       icon: 'https://cdn.jsdelivr.net/gh/Koolson/Qure@master/IconSet/Color/Game.png',
-      proxies: ['Без VPN (напрямую)', '🌍 Сервер'],
+      proxies: ['Без VPN (напрямую)', '🌍 Зарубежный сервер'],
       use: ['foreign_servers']
     },
     {
       name: '📋 My Rules',
       type: 'select',
       hidden: true,
-      proxies: ['🌍 Сервер', 'Без VPN (напрямую)'],
+      proxies: ['🌍 Зарубежный сервер', 'Без VPN (напрямую)'],
       use: ['foreign_servers']
     }
   );
@@ -867,7 +860,7 @@ function buildRules(options = {}) {
     'OR,((RULE-SET,geosite-openai),(RULE-SET,google-gemini),(RULE-SET,geosite-anthropic),(DOMAIN-SUFFIX,grok.com),(DOMAIN-SUFFIX,x.ai),(DOMAIN-SUFFIX,appcenter.ms),(DOMAIN-SUFFIX,copilot.microsoft.com),(PROCESS-NAME-REGEX,(?i).*(chatgpt|claude|copilot|gemini|cursor|windsurf|cline|antigravity|opencode).*),(PROCESS-NAME,opencode),(PROCESS-NAME,com.openai.chatgpt),(PROCESS-NAME,com.anthropic.claude),(PROCESS-NAME,com.microsoft.copilot),(PROCESS-NAME,ai.perplexity.app.android)),🤖 AI (Нейронки)',
     'RULE-SET,geosite-supercell,👾 Brawl Stars',
     'RULE-SET,category-porn,🔞 18+',
-    'RULE-SET,torrent-trackers,🌍 Сервер',
+    'RULE-SET,torrent-trackers,🌍 Зарубежный сервер',
     'RULE-SET,geosite-google,🔎 Google',
 
     // 5. Заблокированные домены РФ (должны идти ДО безусловных .ru)
@@ -905,6 +898,11 @@ function generateConfig(userName, ruProviderUrl, foreignProviderUrl, excludePack
     'allow-lan': false,
     'unified-delay': true,
     'tcp-concurrent': true,
+
+    proxies: [
+      { name: 'Без VPN (напрямую)', type: 'direct', udp: true },
+      { name: 'Блокировать', type: 'reject' }
+    ],
 
     dns: buildDns(),
     tun: buildTun(excludePackages, options),

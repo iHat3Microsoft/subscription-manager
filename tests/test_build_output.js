@@ -17,7 +17,7 @@ async function testDns() {
   assert.ok(dns['proxy-server-nameserver'].every(s => s.includes('disable-ipv6=true')), 'proxy-server-nameserver must have disable-ipv6=true');
   assert.ok(dns['direct-nameserver'].every(s => s.includes('disable-ipv6=true')), 'direct-nameserver must have disable-ipv6=true');
 
-  assert.ok(dns.nameserver.every(ns => ns.includes('#🌍 Сервер')), 'nameserver DoH must route to proxy group via # suffix');
+  assert.ok(dns.nameserver.every(ns => ns.includes('#🌍 Зарубежный сервер')), 'nameserver DoH must route to proxy group via # suffix');
   assert.ok(dns.nameserver.some(ns => ns.includes('1.1.1.1')), 'nameserver must include 1.1.1.1');
   assert.ok(dns.nameserver.some(ns => ns.includes('8.8.8.8')), 'nameserver must include 8.8.8.8');
 
@@ -59,7 +59,7 @@ async function testSniffer() {
 async function testProxyGroups() {
   const stableGroups = build.buildProxyGroups({ experimental: false });
   assert.strictEqual(stableGroups.some(g => g.name === '⚡ Параллельно'), false);
-  const stableForeign = stableGroups.find(g => g.name === '🌍 Сервер');
+  const stableForeign = stableGroups.find(g => g.name === '🌍 Зарубежный сервер');
   assert.deepStrictEqual(stableForeign.proxies, ['♻️ Автовыбор']);
 
   const expGroups = build.buildProxyGroups({ experimental: true });
@@ -68,25 +68,25 @@ async function testProxyGroups() {
   assert.strictEqual(lbGroup.type, 'load-balance');
   assert.strictEqual(lbGroup.strategy, 'sticky-sessions');
 
-  const expForeign = expGroups.find(g => g.name === '🌍 Сервер');
+  const expForeign = expGroups.find(g => g.name === '🌍 Зарубежный сервер');
   assert.ok(expForeign.proxies.includes('⚡ Параллельно'));
   assert.strictEqual(expForeign.proxies[0], '⚡ Параллельно', 'Balancing must be default in experimental mode');
 
   const aiGroup = stableGroups.find(g => g.name === '🤖 AI (Нейронки)');
-  assert.deepStrictEqual(aiGroup.proxies, ['♻️ Автовыбор', '🌍 Сервер']);
+  assert.deepStrictEqual(aiGroup.proxies, ['♻️ Автовыбор', '🌍 Зарубежный сервер']);
 
-  const directGroup = stableGroups.find(g => g.name === 'Без VPN (напрямую)');
-  assert.ok(directGroup, 'Без VPN (напрямую) group must exist');
-  assert.strictEqual(directGroup.hidden, true);
-  assert.deepStrictEqual(directGroup.proxies, ['DIRECT']);
+  const adGroup = stableGroups.find(g => g.name === '🚫 Реклама');
+  assert.ok(adGroup, 'Adblock group must exist');
+  assert.deepStrictEqual(adGroup.proxies, ['Блокировать', 'Без VPN (напрямую)', '🌍 Зарубежный сервер']);
+  assert.strictEqual(adGroup.use, undefined, 'Adblock must not list individual servers in use: [...]');
 
   const googleGroup = stableGroups.find(g => g.name === '🔎 Google');
-  assert.deepStrictEqual(googleGroup.proxies, ['Без VPN (напрямую)', '♻️ Автовыбор', '🌍 Сервер']);
+  assert.deepStrictEqual(googleGroup.proxies, ['Без VPN (напрямую)', '♻️ Автовыбор', '🌍 Зарубежный сервер']);
 
   const musicGroup = stableGroups.find(g => g.name === '🎵 Spotify / SoundCloud');
   assert.ok(musicGroup, 'Spotify / SoundCloud group must exist');
   assert.strictEqual(musicGroup.hidden, undefined, 'Spotify / SoundCloud group must be visible');
-  assert.deepStrictEqual(musicGroup.proxies, ['♻️ Сначала РФ', '🌍 Сервер', 'Без VPN (напрямую)']);
+  assert.deepStrictEqual(musicGroup.proxies, ['♻️ Сначала РФ', '🌍 Зарубежный сервер', 'Без VPN (напрямую)']);
 
   console.log('ok - Proxy groups and sticky-sessions load-balance verified');
 }
@@ -171,6 +171,9 @@ async function testGenerateConfig() {
   const stable = build.generateConfig('User1', 'http://ru', 'http://foreign', [], { experimental: false });
   assert.strictEqual(stable.ipv6, false);
   assert.strictEqual(stable.tun.stack, 'mixed');
+  assert.ok(Array.isArray(stable.proxies), 'proxies must be an array');
+  assert.ok(stable.proxies.some(p => p.name === 'Без VPN (напрямую)' && p.type === 'direct'), 'Без VPN (напрямую) direct proxy must exist');
+  assert.ok(stable.proxies.some(p => p.name === 'Блокировать' && p.type === 'reject'), 'Блокировать reject proxy must exist');
 
   const exp = build.generateConfig('User1', 'http://ru', 'http://foreign', [], { experimental: true });
   assert.strictEqual(exp.ipv6, true);
