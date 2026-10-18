@@ -149,7 +149,6 @@ SSH_OPTS=(
     -o "ControlMaster=auto"
     -o "ControlPath=$SSH_TMP_DIR/master.sock"
     -o "ControlPersist=5m"
-    -o "BatchMode=yes"
     -o "ConnectTimeout=15"
     -o "ServerAliveInterval=15"
     -o "ServerAliveCountMax=3"
