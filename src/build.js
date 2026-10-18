@@ -372,6 +372,12 @@ function buildProxyGroups(options = {}) {
       timeout: 5000,
       'max-failed-times': 3,
       use: ['ru_servers', 'foreign_servers']
+    },
+    {
+      name: 'Без VPN (напрямую)',
+      type: 'select',
+      hidden: true,
+      proxies: ['DIRECT']
     }
   ];
 
@@ -402,42 +408,42 @@ function buildProxyGroups(options = {}) {
       name: '🌐 Остальной трафик',
       type: 'select',
       icon: 'https://cdn.jsdelivr.net/gh/Koolson/Qure@master/IconSet/Color/Auto.png',
-      proxies: ['DIRECT', '🌍 Сервер'],
+      proxies: ['Без VPN (напрямую)', '🌍 Сервер'],
       use: ['foreign_servers']
     },
     {
       name: '▶️ YouTube',
       type: 'select',
       icon: 'https://cdn.jsdelivr.net/gh/Koolson/Qure@master/IconSet/Color/YouTube.png',
-      proxies: ['♻️ Сначала РФ', '🌍 Сервер', 'DIRECT'],
+      proxies: ['♻️ Сначала РФ', '🌍 Сервер', 'Без VPN (напрямую)'],
       use: ['ru_servers', 'foreign_servers']
     },
     {
       name: '🔎 Google',
       type: 'select',
       icon: 'https://cdn.jsdelivr.net/gh/Koolson/Qure@master/IconSet/Color/Google_Search.png',
-      proxies: ['DIRECT', '♻️ Автовыбор', '🌍 Сервер'],
+      proxies: ['Без VPN (напрямую)', '♻️ Автовыбор', '🌍 Сервер'],
       use: ['foreign_servers']
     },
     {
       name: '🚫 Реклама',
       type: 'select',
       icon: 'https://raw.githubusercontent.com/remnawave/templates/refs/heads/main/icons/AdBlock.png',
-      proxies: ['REJECT', 'DIRECT', '🌍 Сервер'],
+      proxies: ['REJECT', 'Без VPN (напрямую)', '🌍 Сервер'],
       use: ['foreign_servers']
     },
     {
       name: '💬 Discord',
       type: 'select',
       icon: 'https://raw.githubusercontent.com/remnawave/templates/refs/heads/main/icons/Discord.png',
-      proxies: ['♻️ Сначала РФ', '🌍 Сервер', 'DIRECT'],
+      proxies: ['♻️ Сначала РФ', '🌍 Сервер', 'Без VPN (напрямую)'],
       use: ['ru_servers', 'foreign_servers']
     },
     {
       name: '🎵 Spotify / SoundCloud',
       type: 'select',
       icon: 'https://cdn.jsdelivr.net/gh/Koolson/Qure@master/IconSet/Color/Spotify.png',
-      proxies: ['♻️ Сначала РФ', '🌍 Сервер', 'DIRECT'],
+      proxies: ['♻️ Сначала РФ', '🌍 Сервер', 'Без VPN (напрямую)'],
       use: ['ru_servers', 'foreign_servers']
     },
     {
@@ -445,7 +451,7 @@ function buildProxyGroups(options = {}) {
       type: 'select',
       hidden: true,
       icon: 'https://raw.githubusercontent.com/remnawave/templates/refs/heads/main/icons/Blocked.png',
-      proxies: ['🌍 Сервер', 'DIRECT'],
+      proxies: ['🌍 Сервер', 'Без VPN (напрямую)'],
       use: ['foreign_servers']
     },
     {
@@ -453,7 +459,7 @@ function buildProxyGroups(options = {}) {
       type: 'select',
       hidden: true,
       icon: 'https://cdn.jsdelivr.net/gh/Koolson/Qure@master/IconSet/Color/Pornhub.png',
-      proxies: ['🌍 Сервер', 'DIRECT'],
+      proxies: ['🌍 Сервер', 'Без VPN (напрямую)'],
       use: ['foreign_servers']
     },
     {
@@ -461,7 +467,7 @@ function buildProxyGroups(options = {}) {
       type: 'select',
       hidden: true,
       icon: 'https://cdn.jsdelivr.net/gh/Koolson/Qure@master/IconSet/Color/WhatsApp.png',
-      proxies: ['🌍 Сервер', 'DIRECT'],
+      proxies: ['🌍 Сервер', 'Без VPN (напрямую)'],
       use: ['foreign_servers']
     },
     {
@@ -477,7 +483,7 @@ function buildProxyGroups(options = {}) {
       type: 'select',
       hidden: true,
       icon: 'https://cdn.jsdelivr.net/gh/Koolson/Qure@master/IconSet/Color/Telegram.png',
-      proxies: ['🌍 Сервер', 'DIRECT'],
+      proxies: ['🌍 Сервер', 'Без VPN (напрямую)'],
       use: ['foreign_servers']
     },
     {
@@ -525,14 +531,14 @@ function buildProxyGroups(options = {}) {
       type: 'select',
       hidden: true,
       icon: 'https://cdn.jsdelivr.net/gh/Koolson/Qure@master/IconSet/Color/Game.png',
-      proxies: ['DIRECT', '🌍 Сервер'],
+      proxies: ['Без VPN (напрямую)', '🌍 Сервер'],
       use: ['foreign_servers']
     },
     {
       name: '📋 My Rules',
       type: 'select',
       hidden: true,
-      proxies: ['🌍 Сервер', 'DIRECT'],
+      proxies: ['🌍 Сервер', 'Без VPN (напрямую)'],
       use: ['foreign_servers']
     }
   );

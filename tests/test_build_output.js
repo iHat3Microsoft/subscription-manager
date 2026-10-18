@@ -75,13 +75,18 @@ async function testProxyGroups() {
   const aiGroup = stableGroups.find(g => g.name === '🤖 AI (Нейронки)');
   assert.deepStrictEqual(aiGroup.proxies, ['♻️ Автовыбор', '🌍 Сервер']);
 
+  const directGroup = stableGroups.find(g => g.name === 'Без VPN (напрямую)');
+  assert.ok(directGroup, 'Без VPN (напрямую) group must exist');
+  assert.strictEqual(directGroup.hidden, true);
+  assert.deepStrictEqual(directGroup.proxies, ['DIRECT']);
+
   const googleGroup = stableGroups.find(g => g.name === '🔎 Google');
-  assert.deepStrictEqual(googleGroup.proxies, ['DIRECT', '♻️ Автовыбор', '🌍 Сервер']);
+  assert.deepStrictEqual(googleGroup.proxies, ['Без VPN (напрямую)', '♻️ Автовыбор', '🌍 Сервер']);
 
   const musicGroup = stableGroups.find(g => g.name === '🎵 Spotify / SoundCloud');
   assert.ok(musicGroup, 'Spotify / SoundCloud group must exist');
   assert.strictEqual(musicGroup.hidden, undefined, 'Spotify / SoundCloud group must be visible');
-  assert.deepStrictEqual(musicGroup.proxies, ['♻️ Сначала РФ', '🌍 Сервер', 'DIRECT']);
+  assert.deepStrictEqual(musicGroup.proxies, ['♻️ Сначала РФ', '🌍 Сервер', 'Без VPN (напрямую)']);
 
   console.log('ok - Proxy groups and sticky-sessions load-balance verified');
 }
