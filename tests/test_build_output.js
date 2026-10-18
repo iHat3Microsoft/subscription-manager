@@ -17,7 +17,7 @@ async function testDns() {
   assert.ok(dns['proxy-server-nameserver'].every(s => s.includes('disable-ipv6=true')), 'proxy-server-nameserver must have disable-ipv6=true');
   assert.ok(dns['direct-nameserver'].every(s => s.includes('disable-ipv6=true')), 'direct-nameserver must have disable-ipv6=true');
 
-  assert.ok(dns.nameserver.every(ns => ns.includes('#🌍 Иностранные серверы')), 'nameserver DoH must route to proxy group via # suffix');
+  assert.ok(dns.nameserver.every(ns => ns.includes('#🌍 Сервер')), 'nameserver DoH must route to proxy group via # suffix');
   assert.ok(dns.nameserver.some(ns => ns.includes('1.1.1.1')), 'nameserver must include 1.1.1.1');
   assert.ok(dns.nameserver.some(ns => ns.includes('8.8.8.8')), 'nameserver must include 8.8.8.8');
 
@@ -58,25 +58,30 @@ async function testSniffer() {
 
 async function testProxyGroups() {
   const stableGroups = build.buildProxyGroups({ experimental: false });
-  assert.strictEqual(stableGroups.some(g => g.name === '⚖️ Балансировка (Иностранные)'), false);
-  const stableForeign = stableGroups.find(g => g.name === '🌍 Иностранные серверы');
-  assert.deepStrictEqual(stableForeign.proxies, ['♻️ Автовыбор (Иностранные)']);
+  assert.strictEqual(stableGroups.some(g => g.name === '⚡ Параллельно'), false);
+  const stableForeign = stableGroups.find(g => g.name === '🌍 Сервер');
+  assert.deepStrictEqual(stableForeign.proxies, ['♻️ Автовыбор']);
 
   const expGroups = build.buildProxyGroups({ experimental: true });
-  const lbGroup = expGroups.find(g => g.name === '⚖️ Балансировка (Иностранные)');
+  const lbGroup = expGroups.find(g => g.name === '⚡ Параллельно');
   assert.ok(lbGroup, 'load-balance group must exist in experimental mode');
   assert.strictEqual(lbGroup.type, 'load-balance');
   assert.strictEqual(lbGroup.strategy, 'sticky-sessions');
 
-  const expForeign = expGroups.find(g => g.name === '🌍 Иностранные серверы');
-  assert.ok(expForeign.proxies.includes('⚖️ Балансировка (Иностранные)'));
-  assert.strictEqual(expForeign.proxies[0], '⚖️ Балансировка (Иностранные)', 'Balancing must be default in experimental mode');
+  const expForeign = expGroups.find(g => g.name === '🌍 Сервер');
+  assert.ok(expForeign.proxies.includes('⚡ Параллельно'));
+  assert.strictEqual(expForeign.proxies[0], '⚡ Параллельно', 'Balancing must be default in experimental mode');
 
   const aiGroup = stableGroups.find(g => g.name === '🤖 AI (Нейронки)');
-  assert.deepStrictEqual(aiGroup.proxies, ['♻️ Автовыбор (Иностранные)', '🌍 Иностранные серверы']);
+  assert.deepStrictEqual(aiGroup.proxies, ['♻️ Автовыбор', '🌍 Сервер']);
 
   const googleGroup = stableGroups.find(g => g.name === '🔎 Google');
-  assert.deepStrictEqual(googleGroup.proxies, ['DIRECT', '♻️ Автовыбор (Иностранные)', '🌍 Иностранные серверы']);
+  assert.deepStrictEqual(googleGroup.proxies, ['DIRECT', '♻️ Автовыбор', '🌍 Сервер']);
+
+  const musicGroup = stableGroups.find(g => g.name === '🎵 Spotify / SoundCloud');
+  assert.ok(musicGroup, 'Spotify / SoundCloud group must exist');
+  assert.strictEqual(musicGroup.hidden, undefined, 'Spotify / SoundCloud group must be visible');
+  assert.deepStrictEqual(musicGroup.proxies, ['♻️ Сначала РФ', '🌍 Сервер', 'DIRECT']);
 
   console.log('ok - Proxy groups and sticky-sessions load-balance verified');
 }
@@ -97,6 +102,8 @@ async function testRuleProviders() {
 
   assert.strictEqual(defaultProviders['geosite-tiktok'].format, 'mrs');
   assert.strictEqual(defaultProviders['geosite-tiktok'].path, './rule-sets/tiktok.mrs');
+  assert.strictEqual(defaultProviders['geosite-soundcloud'].format, 'mrs');
+  assert.strictEqual(defaultProviders['geosite-spotify'].format, 'mrs');
 
   console.log('ok - Rule providers verified (default oisd_small, opt-in oisd_big, ru-blocked text format, geosite-tiktok mrs)');
 }
@@ -147,6 +154,10 @@ async function testRules() {
   assert.strictEqual(aiRule.includes('DOMAIN-KEYWORD,grok'), false, 'broad grok keyword must be removed');
   assert.strictEqual(aiRule.includes('DOMAIN-KEYWORD,copilot'), false, 'broad copilot keyword must be removed');
   assert.ok(aiRule.includes('DOMAIN-SUFFIX,grok.com'), 'exact grok.com suffix must remain');
+
+  assert.ok(stableRules.includes('RULE-SET,category-porn,🔞 18+'));
+  assert.ok(stableRules.includes('RULE-SET,geosite-soundcloud,🎵 Spotify / SoundCloud'));
+  assert.ok(stableRules.includes('RULE-SET,geosite-spotify,🎵 Spotify / SoundCloud'));
 
   console.log('ok - Rules ordering, no-resolve and cleanups verified');
 }

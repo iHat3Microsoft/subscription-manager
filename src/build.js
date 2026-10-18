@@ -225,8 +225,8 @@ function buildDns() {
       '77.88.8.8#disable-ipv6=true'
     ],
     nameserver: [
-      'https://1.1.1.1/dns-query#🌍 Иностранные серверы',
-      'https://8.8.8.8/dns-query#🌍 Иностранные серверы'
+      'https://1.1.1.1/dns-query#🌍 Сервер',
+      'https://8.8.8.8/dns-query#🌍 Сервер'
     ],
     'nameserver-policy': {
       'geosite:category-ru': [
@@ -336,12 +336,12 @@ function buildProxyProviders(ruProviderUrl, foreignProviderUrl) {
 function buildProxyGroups(options = {}) {
   const isExp = Boolean(options.experimental);
   const foreignProxies = isExp
-    ? ['⚖️ Балансировка (Иностранные)', '♻️ Автовыбор (Иностранные)']
-    : ['♻️ Автовыбор (Иностранные)'];
+    ? ['⚡ Параллельно', '♻️ Автовыбор']
+    : ['♻️ Автовыбор'];
 
   const groups = [
     {
-      name: '♻️ Автовыбор (Иностранные)',
+      name: '♻️ Автовыбор',
       type: 'fallback',
       hidden: true,
       lazy: true,
@@ -352,7 +352,7 @@ function buildProxyGroups(options = {}) {
       use: ['foreign_servers']
     },
     {
-      name: '♻️ Автовыбор (Россия)',
+      name: '♻️ Автовыбор РФ',
       type: 'fallback',
       hidden: true,
       lazy: true,
@@ -363,7 +363,7 @@ function buildProxyGroups(options = {}) {
       use: ['ru_servers']
     },
     {
-      name: '♻️ Резерв (RU -> EU)',
+      name: '♻️ Сначала РФ',
       type: 'fallback',
       hidden: true,
       lazy: true,
@@ -377,7 +377,7 @@ function buildProxyGroups(options = {}) {
 
   if (isExp) {
     groups.push({
-      name: '⚖️ Балансировка (Иностранные)',
+      name: '⚡ Параллельно',
       type: 'load-balance',
       strategy: 'sticky-sessions',
       hidden: true,
@@ -392,45 +392,52 @@ function buildProxyGroups(options = {}) {
 
   groups.push(
     {
-      name: '🌍 Иностранные серверы',
+      name: '🌍 Сервер',
       type: 'select',
       icon: 'https://cdn.jsdelivr.net/gh/Koolson/Qure@master/IconSet/Color/Global.png',
       proxies: foreignProxies,
       use: ['foreign_servers']
     },
     {
-      name: '🌐 Остальной трафик (MATCH)',
+      name: '🌐 Остальной трафик',
       type: 'select',
       icon: 'https://cdn.jsdelivr.net/gh/Koolson/Qure@master/IconSet/Color/Auto.png',
-      proxies: ['DIRECT', '🌍 Иностранные серверы'],
+      proxies: ['DIRECT', '🌍 Сервер'],
       use: ['foreign_servers']
     },
     {
       name: '▶️ YouTube',
       type: 'select',
       icon: 'https://cdn.jsdelivr.net/gh/Koolson/Qure@master/IconSet/Color/YouTube.png',
-      proxies: ['♻️ Резерв (RU -> EU)', '🌍 Иностранные серверы', 'DIRECT'],
+      proxies: ['♻️ Сначала РФ', '🌍 Сервер', 'DIRECT'],
       use: ['ru_servers', 'foreign_servers']
     },
     {
       name: '🔎 Google',
       type: 'select',
       icon: 'https://cdn.jsdelivr.net/gh/Koolson/Qure@master/IconSet/Color/Google_Search.png',
-      proxies: ['DIRECT', '♻️ Автовыбор (Иностранные)', '🌍 Иностранные серверы'],
+      proxies: ['DIRECT', '♻️ Автовыбор', '🌍 Сервер'],
       use: ['foreign_servers']
     },
     {
       name: '🚫 Реклама',
       type: 'select',
       icon: 'https://raw.githubusercontent.com/remnawave/templates/refs/heads/main/icons/AdBlock.png',
-      proxies: ['REJECT', 'DIRECT', '🌍 Иностранные серверы'],
+      proxies: ['REJECT', 'DIRECT', '🌍 Сервер'],
       use: ['foreign_servers']
     },
     {
       name: '💬 Discord',
       type: 'select',
       icon: 'https://raw.githubusercontent.com/remnawave/templates/refs/heads/main/icons/Discord.png',
-      proxies: ['♻️ Резерв (RU -> EU)', '🌍 Иностранные серверы', 'DIRECT'],
+      proxies: ['♻️ Сначала РФ', '🌍 Сервер', 'DIRECT'],
+      use: ['ru_servers', 'foreign_servers']
+    },
+    {
+      name: '🎵 Spotify / SoundCloud',
+      type: 'select',
+      icon: 'https://cdn.jsdelivr.net/gh/Koolson/Qure@master/IconSet/Color/Spotify.png',
+      proxies: ['♻️ Сначала РФ', '🌍 Сервер', 'DIRECT'],
       use: ['ru_servers', 'foreign_servers']
     },
     {
@@ -438,7 +445,7 @@ function buildProxyGroups(options = {}) {
       type: 'select',
       hidden: true,
       icon: 'https://raw.githubusercontent.com/remnawave/templates/refs/heads/main/icons/Blocked.png',
-      proxies: ['🌍 Иностранные серверы', 'DIRECT'],
+      proxies: ['🌍 Сервер', 'DIRECT'],
       use: ['foreign_servers']
     },
     {
@@ -446,7 +453,7 @@ function buildProxyGroups(options = {}) {
       type: 'select',
       hidden: true,
       icon: 'https://cdn.jsdelivr.net/gh/Koolson/Qure@master/IconSet/Color/Pornhub.png',
-      proxies: ['🌍 Иностранные серверы', 'DIRECT'],
+      proxies: ['🌍 Сервер', 'DIRECT'],
       use: ['foreign_servers']
     },
     {
@@ -454,7 +461,7 @@ function buildProxyGroups(options = {}) {
       type: 'select',
       hidden: true,
       icon: 'https://cdn.jsdelivr.net/gh/Koolson/Qure@master/IconSet/Color/WhatsApp.png',
-      proxies: ['🌍 Иностранные серверы', 'DIRECT'],
+      proxies: ['🌍 Сервер', 'DIRECT'],
       use: ['foreign_servers']
     },
     {
@@ -462,7 +469,7 @@ function buildProxyGroups(options = {}) {
       type: 'select',
       hidden: true,
       icon: 'https://cdn.jsdelivr.net/gh/Koolson/Qure@master/IconSet/Color/Instagram.png',
-      proxies: ['🌍 Иностранные серверы'],
+      proxies: ['🌍 Сервер'],
       use: ['foreign_servers']
     },
     {
@@ -470,7 +477,7 @@ function buildProxyGroups(options = {}) {
       type: 'select',
       hidden: true,
       icon: 'https://cdn.jsdelivr.net/gh/Koolson/Qure@master/IconSet/Color/Telegram.png',
-      proxies: ['🌍 Иностранные серверы', 'DIRECT'],
+      proxies: ['🌍 Сервер', 'DIRECT'],
       use: ['foreign_servers']
     },
     {
@@ -478,7 +485,7 @@ function buildProxyGroups(options = {}) {
       type: 'select',
       hidden: true,
       icon: 'https://cdn.jsdelivr.net/gh/Koolson/Qure@master/IconSet/Color/TikTok.png',
-      proxies: ['🌍 Иностранные серверы'],
+      proxies: ['🌍 Сервер'],
       use: ['foreign_servers']
     },
     {
@@ -486,7 +493,7 @@ function buildProxyGroups(options = {}) {
       type: 'select',
       hidden: true,
       icon: 'https://cdn.jsdelivr.net/gh/Koolson/Qure@master/IconSet/Color/Spark.png',
-      proxies: ['♻️ Автовыбор (Иностранные)', '🌍 Иностранные серверы'],
+      proxies: ['♻️ Автовыбор', '🌍 Сервер'],
       use: ['foreign_servers']
     },
     {
@@ -494,7 +501,7 @@ function buildProxyGroups(options = {}) {
       type: 'select',
       hidden: true,
       icon: 'https://cdn.jsdelivr.net/gh/Koolson/Qure@master/IconSet/Color/Game.png',
-      proxies: ['🌍 Иностранные серверы'],
+      proxies: ['🌍 Сервер'],
       use: ['foreign_servers']
     },
     {
@@ -502,7 +509,7 @@ function buildProxyGroups(options = {}) {
       type: 'select',
       hidden: true,
       icon: 'https://cdn.jsdelivr.net/gh/Koolson/Qure@master/IconSet/Color/Facebook.png',
-      proxies: ['🌍 Иностранные серверы'],
+      proxies: ['🌍 Сервер'],
       use: ['foreign_servers']
     },
     {
@@ -510,7 +517,7 @@ function buildProxyGroups(options = {}) {
       type: 'select',
       hidden: true,
       icon: 'https://cdn.jsdelivr.net/gh/Koolson/Qure@master/IconSet/Color/Russia.png',
-      proxies: ['♻️ Автовыбор (Россия)'],
+      proxies: ['♻️ Автовыбор РФ'],
       use: ['ru_servers']
     },
     {
@@ -518,14 +525,14 @@ function buildProxyGroups(options = {}) {
       type: 'select',
       hidden: true,
       icon: 'https://cdn.jsdelivr.net/gh/Koolson/Qure@master/IconSet/Color/Game.png',
-      proxies: ['DIRECT', '🌍 Иностранные серверы'],
+      proxies: ['DIRECT', '🌍 Сервер'],
       use: ['foreign_servers']
     },
     {
       name: '📋 My Rules',
       type: 'select',
       hidden: true,
-      proxies: ['🌍 Иностранные серверы', 'DIRECT'],
+      proxies: ['🌍 Сервер', 'DIRECT'],
       use: ['foreign_servers']
     }
   );
@@ -637,6 +644,14 @@ function buildRuleProviders(options = {}) {
       format: 'mrs',
       url: 'https://github.com/MetaCubeX/meta-rules-dat/raw/meta/geo/geosite/soundcloud.mrs',
       path: './rule-sets/soundcloud.mrs',
+      interval: 86400
+    },
+    'geosite-spotify': {
+      behavior: 'domain',
+      type: 'http',
+      format: 'mrs',
+      url: 'https://github.com/MetaCubeX/meta-rules-dat/raw/meta/geo/geosite/spotify.mrs',
+      path: './rule-sets/spotify.mrs',
       interval: 86400
     },
     'telegram-domains': {
@@ -841,11 +856,12 @@ function buildRules(options = {}) {
     'PROCESS-NAME-REGEX,(?i).*telegram.*,➤ Telegram',
     'PROCESS-NAME,org.telegram.messenger,➤ Telegram',
     'RULE-SET,geosite-tiktok,🎵 TikTok',
-    'RULE-SET,geosite-soundcloud,🌍 Иностранные серверы',
+    'RULE-SET,geosite-soundcloud,🎵 Spotify / SoundCloud',
+    'RULE-SET,geosite-spotify,🎵 Spotify / SoundCloud',
     'OR,((RULE-SET,geosite-openai),(RULE-SET,google-gemini),(RULE-SET,geosite-anthropic),(DOMAIN-SUFFIX,grok.com),(DOMAIN-SUFFIX,x.ai),(DOMAIN-SUFFIX,appcenter.ms),(DOMAIN-SUFFIX,copilot.microsoft.com),(PROCESS-NAME-REGEX,(?i).*(chatgpt|claude|copilot|gemini|cursor|windsurf|cline|antigravity|opencode).*),(PROCESS-NAME,opencode),(PROCESS-NAME,com.openai.chatgpt),(PROCESS-NAME,com.anthropic.claude),(PROCESS-NAME,com.microsoft.copilot),(PROCESS-NAME,ai.perplexity.app.android)),🤖 AI (Нейронки)',
     'RULE-SET,geosite-supercell,👾 Brawl Stars',
     'RULE-SET,category-porn,🔞 18+',
-    'RULE-SET,torrent-trackers,🌍 Иностранные серверы',
+    'RULE-SET,torrent-trackers,🌍 Сервер',
     'RULE-SET,geosite-google,🔎 Google',
 
     // 5. Заблокированные домены РФ (должны идти ДО безусловных .ru)
@@ -867,7 +883,7 @@ function buildRules(options = {}) {
     'RULE-SET,rknasnblock,🚫 Заблокированные сайты (RU)',
 
     // 8. Финальный фоллбэк
-    'MATCH,🌐 Остальной трафик (MATCH)'
+    'MATCH,🌐 Остальной трафик'
   );
 
   return rules;
