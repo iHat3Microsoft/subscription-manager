@@ -286,8 +286,7 @@ function buildSniffer() {
     'parse-pure-ip': true,
     sniff: {
       HTTP: { ports: [80, '8080-8880'], 'override-destination': true },
-      TLS: { ports: [443, 8443] },
-      QUIC: { ports: [443, 8443] }
+      TLS: { ports: [443, 8443] }
     },
     'skip-dst-address': [
       '0.0.0.0/8',

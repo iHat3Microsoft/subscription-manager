@@ -51,9 +51,9 @@ async function testTun() {
 async function testSniffer() {
   const sniffer = build.buildSniffer();
   assert.strictEqual(sniffer.enable, true);
-  assert.ok(sniffer.sniff.QUIC, 'QUIC sniffing must be enabled');
-  assert.deepStrictEqual(sniffer.sniff.QUIC.ports, [443, 8443]);
-  console.log('ok - Sniffer QUIC verified');
+  assert.strictEqual(sniffer.sniff.QUIC, undefined, 'QUIC sniffing must be removed (no REJECT-QUIC rule)');
+  assert.ok(sniffer.sniff.TLS, 'TLS sniffing must be present');
+  console.log('ok - Sniffer verified (no QUIC)');
 }
 
 async function testProxyGroups() {
