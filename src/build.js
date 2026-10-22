@@ -919,8 +919,9 @@ function generateConfig(userName, ruProviderUrl, foreignProviderUrl, excludePack
 async function collectProxiesFromDir(dir) {
   const proxies = [];
   if (!fs.existsSync(dir)) return proxies;
-  for (const f of fs.readdirSync(dir).sort()) {
-    const content = fs.readFileSync(path.join(dir, f), 'utf-8');
+  const files = (await fs.promises.readdir(dir)).sort();
+  for (const f of files) {
+    const content = await fs.promises.readFile(path.join(dir, f), 'utf-8');
     const baseName = f.replace(/\.[^/.]+$/, '');
 
     for (const line of content.split('\n')) {
@@ -1372,6 +1373,7 @@ module.exports = {
   isIosUser,
   getAdblockPreference,
   parseUserTimer,
+  collectProxiesFromDir,
   buildAll
 };
 
