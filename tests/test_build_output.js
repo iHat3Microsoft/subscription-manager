@@ -264,6 +264,23 @@ async function testUserTimer() {
   console.log('ok - User timer & traffic limits verified');
 }
 
+async function testBuildAll() {
+  const tmpDataDir = path.join(__dirname, 'tmp_data_test');
+  const userDir = path.join(tmpDataDir, 'testuser');
+  const ruDir = path.join(userDir, 'ru');
+  fs.mkdirSync(ruDir, { recursive: true });
+  fs.writeFileSync(path.join(ruDir, 'test.txt'), 'vless://uuid@1.2.3.4:443?type=tcp#TestServer');
+
+  const oldDataDir = process.env.DATA_DIR;
+  try {
+    // Run buildAll to ensure async downloading and processing work end-to-end
+    await build.buildAll();
+  } finally {
+    fs.rmSync(tmpDataDir, { recursive: true, force: true });
+  }
+  console.log('ok - buildAll execution verified');
+}
+
 async function main() {
   await testDns();
   await testTun();
@@ -275,6 +292,7 @@ async function main() {
   await testBuildMode();
   await testIosDetection();
   await testUserTimer();
+  await testBuildAll();
   console.log('build: all assertions passed');
 }
 

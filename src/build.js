@@ -36,14 +36,17 @@ function parseRuAppList(raw) {
   return [...new Set(pkgs)].sort();
 }
 
-function downloadRuAppList() {
-  const { execSync } = require('child_process');
+async function downloadRuAppList() {
   fs.mkdirSync(path.dirname(RU_APP_LIST_CACHE), { recursive: true });
-  execSync(`curl -fsSL "${RU_APP_LIST_URL}" -o "${RU_APP_LIST_CACHE}.tmp"`);
-  fs.renameSync(`${RU_APP_LIST_CACHE}.tmp`, RU_APP_LIST_CACHE);
+  const res = await fetch(RU_APP_LIST_URL, { signal: AbortSignal.timeout(20000) });
+  if (!res.ok) throw new Error(`HTTP ${res.status} ${res.statusText}`);
+  const text = await res.text();
+  const tmpPath = `${RU_APP_LIST_CACHE}.tmp`;
+  fs.writeFileSync(tmpPath, text, 'utf8');
+  fs.renameSync(tmpPath, RU_APP_LIST_CACHE);
 }
 
-function loadRuPackages() {
+async function loadRuPackages() {
   const exists = fs.existsSync(RU_APP_LIST_CACHE);
   let isExpired = false;
 
@@ -68,7 +71,7 @@ function loadRuPackages() {
     console.log(isExpired
       ? '[info] ru-app-list cache expired/invalid, re-downloading from legiz ...'
       : '[info] downloading ru-app-list.yaml from legiz ...');
-    downloadRuAppList();
+    await downloadRuAppList();
     return parseRuAppList(fs.readFileSync(RU_APP_LIST_CACHE, 'utf8'));
   } catch (e) {
     if (exists) {
@@ -128,12 +131,12 @@ async function ingestHttpProxyList(url) {
   let body = _urlCache.get(url);
   if (body === undefined) {
     try {
-      const { execFileSync } = require('child_process');
-      body = execFileSync(
-        'curl',
-        ['-fsS', '--max-time', '20', '-H', 'User-Agent: clash.meta', url],
-        { stdio: ['ignore', 'pipe', 'pipe'], encoding: 'utf8' }
-      );
+      const res = await fetch(url, {
+        headers: { 'User-Agent': 'clash.meta' },
+        signal: AbortSignal.timeout(20000)
+      });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      body = await res.text();
     } catch (e) {
       console.error(`[!] could not fetch ${url}: ${e.message.split('\n')[0]}`);
       body = null;
@@ -1169,7 +1172,7 @@ async function buildAll(overrideArg) {
   // Загружаем список RU-пакетов (legiz) один раз для всех юзеров
   let ruPackages = [];
   try {
-    ruPackages = loadRuPackages();
+    ruPackages = await loadRuPackages();
     console.log(`[info] loaded ${ruPackages.length} RU package(s) for tun.exclude-package`);
   } catch (e) {
     console.error(`[warn] failed to load RU packages: ${e.message}`);
