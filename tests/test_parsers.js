@@ -37,6 +37,92 @@ async function main() {
   assert.strictEqual(vmess.alterId, 0);
   assert.strictEqual(vmess.tls, true);
 
+  // --- vmess: WS with early data & headers ---------------------------------
+  const vmessWsB64 = Buffer.from(JSON.stringify({
+    ps: 'VMESS-WS', add: 'ws.example.com', port: 443,
+    id: '12345678-9abc-4def-8123-456789abcde0', aid: 0,
+    net: 'ws', path: '/path?ed=2048', host: 'ws.example.com',
+    tls: 'tls', alpn: 'h2,http/1.1', fp: 'chrome', allowInsecure: '1', scy: 'zero'
+  })).toString('base64');
+  const vmessWs = parsers.parseVmess(`vmess://${vmessWsB64}`);
+  assert.strictEqual(vmessWs.type, 'vmess');
+  assert.strictEqual(vmessWs.name, 'VMESS-WS');
+  assert.strictEqual(vmessWs.server, 'ws.example.com');
+  assert.strictEqual(vmessWs.port, 443);
+  assert.strictEqual(vmessWs.network, 'ws');
+  assert.strictEqual(vmessWs.cipher, 'zero');
+  assert.strictEqual(vmessWs['ws-opts'].path, '/path');
+  assert.strictEqual(vmessWs['ws-opts'].headers.Host, 'ws.example.com');
+  assert.strictEqual(vmessWs['ws-opts']['max-early-data'], 2048);
+  assert.strictEqual(vmessWs['ws-opts']['early-data-header-name'], 'Sec-WebSocket-Protocol');
+  assert.deepStrictEqual(vmessWs.alpn, ['h2', 'http/1.1']);
+  assert.strictEqual(vmessWs['client-fingerprint'], 'chrome');
+  assert.strictEqual(vmessWs['skip-cert-verify'], true);
+
+  // --- vmess: HTTPUpgrade with early data ----------------------------------
+  const vmessHuB64 = Buffer.from(JSON.stringify({
+    add: 'hu.example.com', port: 80, id: '12345678-9abc-4def-8123-456789abcde0',
+    net: 'httpupgrade', path: '/hu?ed=1024&eh=X-Early-Data'
+  })).toString('base64');
+  const vmessHu = parsers.parseVmess(`vmess://${vmessHuB64}`);
+  assert.strictEqual(vmessHu.name, 'vmess-hu.example.com'); // default name fallback
+  assert.strictEqual(vmessHu.network, 'httpupgrade');
+  assert.strictEqual(vmessHu['ws-opts'].path, '/hu?eh=X-Early-Data');
+  assert.strictEqual(vmessHu['ws-opts']['v2ray-http-upgrade-fast-open'], true);
+  assert.strictEqual(vmessHu['ws-opts']['early-data-header-name'], 'X-Early-Data');
+
+  // --- vmess: HTTP / H2 network types --------------------------------------
+  const vmessHttpB64 = Buffer.from(JSON.stringify({
+    add: 'http.example.com', port: 80, id: '12345678-9abc-4def-8123-456789abcde0',
+    type: 'http', host: 'h1.com, h2.com', path: '/http-path'
+  })).toString('base64');
+  const vmessHttp = parsers.parseVmess(`vmess://${vmessHttpB64}`);
+  assert.strictEqual(vmessHttp.network, 'http');
+  assert.deepStrictEqual(vmessHttp['http-opts'].headers.Host, ['h1.com', 'h2.com']);
+  assert.deepStrictEqual(vmessHttp['http-opts'].path, ['/http-path']);
+
+  const vmessH2B64 = Buffer.from(JSON.stringify({
+    add: 'h2.example.com', port: 443, id: '12345678-9abc-4def-8123-456789abcde0',
+    net: 'http', host: 'h2.com', path: '/h2-path'
+  })).toString('base64');
+  const vmessH2 = parsers.parseVmess(`vmess://${vmessH2B64}`);
+  assert.strictEqual(vmessH2.network, 'h2');
+  assert.strictEqual(vmessH2['h2-opts'].path, '/h2-path');
+  assert.deepStrictEqual(vmessH2['h2-opts'].headers.Host, ['h2.com']);
+
+  // --- vmess: gRPC ---------------------------------------------------------
+  const vmessGrpcB64 = Buffer.from(JSON.stringify({
+    add: 'grpc.example.com', port: 443, id: '12345678-9abc-4def-8123-456789abcde0',
+    net: 'grpc', path: 'my-grpc-service'
+  })).toString('base64');
+  const vmessGrpc = parsers.parseVmess(`vmess://${vmessGrpcB64}`);
+  assert.strictEqual(vmessGrpc.network, 'grpc');
+  assert.strictEqual(vmessGrpc['grpc-opts']['grpc-service-name'], 'my-grpc-service');
+
+  // --- vmess: URL style fallback (parseVmessUrl) ---------------------------
+  const vmessUrl = parsers.parseVmess(
+    'vmess://12345678-9abc-4def-8123-456789abcde0@url.example.com:8443' +
+    '?security=tls&type=ws&encryption=chacha20-poly1305&insecure=true#VMESS-URL'
+  );
+  assert.strictEqual(vmessUrl.type, 'vmess');
+  assert.strictEqual(vmessUrl.name, 'VMESS-URL');
+  assert.strictEqual(vmessUrl.server, 'url.example.com');
+  assert.strictEqual(vmessUrl.port, 8443);
+  assert.strictEqual(vmessUrl.uuid, '12345678-9abc-4def-8123-456789abcde0');
+  assert.strictEqual(vmessUrl.cipher, 'chacha20-poly1305');
+  assert.strictEqual(vmessUrl.alterId, 0);
+  assert.strictEqual(vmessUrl.tls, true);
+  assert.strictEqual(vmessUrl['skip-cert-verify'], true);
+
+  // --- vmess: edge cases and malformed inputs -------------------------------
+  // Missing required fields in JSON payload (missing port and id)
+  const vmessInvalidJsonB64 = Buffer.from(JSON.stringify({ add: 'invalid.example.com' })).toString('base64');
+  assert.strictEqual(parsers.parseVmess(`vmess://${vmessInvalidJsonB64}`), null);
+
+  // Invalid base64 JSON payload that is also an invalid URL
+  const vmessGarbageB64 = Buffer.from('not json content').toString('base64');
+  assert.strictEqual(parsers.parseVmess(`vmess://${vmessGarbageB64}`), null);
+
   // --- trojan ----------------------------------------------------------------
   const trojan = await parsers.parseProxyUrl(
     'trojan://secretpw@tro.example.com:443?sni=t.example.com&type=ws&path=%2Fws#TR'
