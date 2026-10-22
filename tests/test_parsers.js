@@ -67,14 +67,73 @@ async function main() {
   assert.strictEqual(tuic['congestion-controller'], 'bbr');
   assert.strictEqual(tuic['udp-relay-mode'], 'native');
 
-  // --- ss: base64 userinfo ------------------------------------------------------
+  // --- ss: standard formats ----------------------------------------------------
+  // 1. Plain userinfo
+  const ssPlain = parsers.parseSS('ss://chacha20-ietf-poly1305:mypassword@ss1.example.com:8443#SS-Plain');
+  assert.strictEqual(ssPlain.type, 'ss');
+  assert.strictEqual(ssPlain.name, 'SS-Plain');
+  assert.strictEqual(ssPlain.cipher, 'chacha20-ietf-poly1305');
+  assert.strictEqual(ssPlain.password, 'mypassword');
+  assert.strictEqual(ssPlain.server, 'ss1.example.com');
+  assert.strictEqual(ssPlain.port, 8443);
+  assert.strictEqual(ssPlain.udp, true);
+
+  // 2. Base64 userinfo
   const ssUserinfo = Buffer.from('aes-256-gcm:sspass').toString('base64');
   const ss = await parsers.parseProxyUrl(`ss://${ssUserinfo}@ss.example.com:8388#SS`);
   assert.strictEqual(ss.type, 'ss');
+  assert.strictEqual(ss.name, 'SS');
   assert.strictEqual(ss.cipher, 'aes-256-gcm');
   assert.strictEqual(ss.password, 'sspass');
   assert.strictEqual(ss.server, 'ss.example.com');
   assert.strictEqual(ss.port, 8388);
+
+  // 3. Full base64 host URL
+  const ssFullB64Str = Buffer.from('aes-256-gcm:pass456@ss3.example.com:8388').toString('base64');
+  const ssFullB64 = parsers.parseSS(`ss://${ssFullB64Str}#SS-FullB64`);
+  assert.strictEqual(ssFullB64.type, 'ss');
+  assert.strictEqual(ssFullB64.name, 'SS-FullB64');
+  assert.strictEqual(ssFullB64.cipher, 'aes-256-gcm');
+  assert.strictEqual(ssFullB64.password, 'pass456');
+  assert.strictEqual(ssFullB64.server, 'ss3.example.com');
+  assert.strictEqual(ssFullB64.port, 8388);
+
+  // 4. Full base64 host URL with default name fallback (no tag hash)
+  const ssFullB64NoTagStr = Buffer.from('aes-128-gcm:pass789@ss4.example.com:8388').toString('base64');
+  const ssFullB64NoTag = parsers.parseSS(`ss://${ssFullB64NoTagStr}`);
+  assert.strictEqual(ssFullB64NoTag.name, 'ss-ss4.example.com');
+  assert.strictEqual(ssFullB64NoTag.server, 'ss4.example.com');
+
+  // --- ss: query parameters & plugins -----------------------------------------
+  // UDP over TCP (udp-over-tcp=true)
+  const ssUot1 = parsers.parseSS('ss://chacha20-ietf-poly1305:mypassword@ss1.example.com:8443?udp-over-tcp=true#SS-Uot1');
+  assert.strictEqual(ssUot1['udp-over-tcp'], true);
+
+  // UDP over TCP (uot=1)
+  const ssUot2 = parsers.parseSS('ss://chacha20-ietf-poly1305:mypassword@ss1.example.com:8443?uot=1#SS-Uot2');
+  assert.strictEqual(ssUot2['udp-over-tcp'], true);
+
+  // obfs plugin
+  const ssObfs = parsers.parseSS(
+    'ss://chacha20-ietf-poly1305:mypassword@ss1.example.com:8443?plugin=obfs-local%3Bobfs%3Dhttp%3Bobfs-host%3Dexample.com#SS-Obfs'
+  );
+  assert.strictEqual(ssObfs.plugin, 'obfs');
+  assert.deepStrictEqual(ssObfs['plugin-opts'], {
+    mode: 'http',
+    host: 'example.com'
+  });
+
+  // v2ray-plugin
+  const ssV2ray = parsers.parseSS(
+    'ss://chacha20-ietf-poly1305:mypassword@ss1.example.com:8443?plugin=v2ray-plugin%3Bmode%3Dwebsocket%3Bhost%3Dexample.com%3Bpath%3D%2Fws%3Btls#SS-V2Ray'
+  );
+  assert.strictEqual(ssV2ray.plugin, 'v2ray-plugin');
+  assert.deepStrictEqual(ssV2ray['plugin-opts'], {
+    mode: 'websocket',
+    host: 'example.com',
+    path: '/ws',
+    tls: true
+  });
 
   // --- raw WG .conf with Amnezia params -----------------------------------------
   const wgConf = [
@@ -116,6 +175,26 @@ async function main() {
   const sub = parsers.parseSubscriptionUrl('https://panel.example.com/sub/abc123');
   assert.strictEqual(sub.type, 'http');
   assert.strictEqual(sub.url, 'https://panel.example.com/sub/abc123');
+
+  // --- ss: edge cases & invalid inputs ----------------------------------------
+  assert.strictEqual(parsers.parseSS('vless://example.com:443'), null);
+  assert.strictEqual(parsers.parseSS('ss://invalid-url-without-port'), null);
+  assert.strictEqual(parsers.parseSS('ss://!!!invalid-base64!!!'), null);
+
+  // Full base64 host decodes to non-URL string
+  const ssBadDecoded = Buffer.from('not-a-valid-url').toString('base64');
+  assert.strictEqual(parsers.parseSS(`ss://${ssBadDecoded}`), null);
+
+  // Base64 userinfo without colon (missing cipher or password separator)
+  const ssNoColon = Buffer.from('noclonuser').toString('base64');
+  assert.strictEqual(parsers.parseSS(`ss://${ssNoColon}@ss.example.com:8388`), null);
+
+  // Empty cipher
+  assert.strictEqual(parsers.parseSS('ss://:pass@ss.example.com:8388'), null);
+
+  // Unknown plugin without semicolon or unhandled plugin
+  const ssUnknownPlugin = parsers.parseSS('ss://chacha20:pass@ss.example.com:8388?plugin=someplugin');
+  assert.strictEqual(ssUnknownPlugin.plugin, undefined);
 
   // --- garbage is rejected, not thrown --------------------------------------------
   assert.strictEqual(await parsers.parseProxyUrl('not a link at all'), null);
