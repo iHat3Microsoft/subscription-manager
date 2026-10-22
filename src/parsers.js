@@ -45,7 +45,6 @@ function parseXHTTPExtra(extra, opts) {
       const tls = ds.tlsSettings;
       if (typeof tls.serverName === 'string' && tls.serverName) dsOpts['servername'] = tls.serverName;
       if (typeof tls.fingerprint === 'string' && tls.fingerprint) dsOpts['client-fingerprint'] = tls.fingerprint;
-      if (tls.allowInsecure === true) dsOpts['skip-cert-verify'] = true;
       if (Array.isArray(tls.alpn) && tls.alpn.length > 0)
         dsOpts['alpn'] = tls.alpn.filter(a => typeof a === 'string');
     }
@@ -206,7 +205,6 @@ function buildVlessProxy({
   security = '',
   servername = '',
   flow = '',
-  skipCertVerify = false,
   alpn = [],
   fingerprint = '',
   tlsFingerprint = '',
@@ -236,7 +234,6 @@ function buildVlessProxy({
   if (sec === 'tls' || sec === 'reality') proxy.tls = true;
   if (servername) proxy.servername = servername;
   if (flow) proxy.flow = flow;
-  if (skipCertVerify) proxy['skip-cert-verify'] = true;
   const alpnList = (Array.isArray(alpn) ? alpn : [alpn]).map(v => String(v).trim()).filter(Boolean);
   if (alpnList.length) proxy.alpn = alpnList;
   switch (String(packetEncoding || '').toLowerCase()) {
@@ -345,7 +342,6 @@ function parseVless(rawUrl) {
   const u = parseBase64HostUrl(rawUrl);
   const p = u?.searchParams;
   if (!p) return proxy;
-  if (parseBoolish(p.get('allowInsecure')) || parseBoolish(p.get('insecure'))) proxy['skip-cert-verify'] = true;
   const flow = p.get('flow');
   if (flow) proxy.flow = flow.toLowerCase();
   const encryption = p.get('encryption');
@@ -379,7 +375,6 @@ function parseVmessLegacyFromJson(json) {
   }
   if (json.sni) proxy.servername = String(json.sni);
   if (json.fp) proxy['client-fingerprint'] = String(json.fp);
-  if (parseBoolish(json.allowInsecure) || parseBoolish(json.insecure)) proxy['skip-cert-verify'] = true;
 
   let network = String(json.net || 'tcp').toLowerCase();
   if (String(json.type || '').toLowerCase() === 'http') {
@@ -436,9 +431,6 @@ function parseVmessUrl(rawUrl) {
   if (!proxy) return null;
   const u = parseUrlOrNull(rawUrl);
   const p = u?.searchParams;
-  if (p && (parseBoolish(p.get('allowInsecure')) || parseBoolish(p.get('insecure')))) {
-    proxy['skip-cert-verify'] = true;
-  }
   proxy.alterId = 0;
   proxy.cipher = p?.get('encryption') || 'auto';
   return proxy;
@@ -533,7 +525,6 @@ function parseTrojan(rawUrl) {
     udp: true
   };
   if (p.get('sni')) proxy.sni = p.get('sni');
-  if (parseBoolish(p.get('allowInsecure')) || parseBoolish(p.get('insecure'))) proxy['skip-cert-verify'] = true;
   const alpn = parseCsv(p.get('alpn'));
   if (alpn.length) proxy.alpn = alpn;
   proxy['client-fingerprint'] = p.get('fp') || 'chrome';
@@ -571,7 +562,6 @@ function parseHysteria2(rawUrl) {
   const password = decodeURIComponentSafe(u.username);
   if (password) proxy.password = password;
   if (p.get('sni')) proxy.sni = p.get('sni');
-  if (parseBoolish(p.get('insecure')) || parseBoolish(p.get('allowInsecure'))) proxy['skip-cert-verify'] = true;
   const obfs = p.get('obfs') || p.get('obfs-type') || p.get('obfs_type');
   if (obfs && obfs !== 'none') {
     proxy.obfs = obfs;
@@ -998,7 +988,6 @@ function parseAmneziaVlessProxy(serverConfig, container) {
     security: stream.security || '',
     servername: reality.serverName || tls.serverName || '',
     flow: user?.flow || '',
-    skipCertVerify: !!tls.allowInsecure || !!reality.allowInsecure,
     alpn: Array.isArray(tls.alpn) ? tls.alpn : (tls.alpn ? [tls.alpn] : []),
     fingerprint: reality.fingerprint || tls.fingerprint || '',
     realityPublicKey: reality.publicKey || '',

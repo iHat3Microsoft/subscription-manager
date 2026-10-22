@@ -53,9 +53,44 @@ async function main() {
   );
   assert.strictEqual(hy2.type, 'hysteria2');
   assert.strictEqual(hy2.password, 'pw');
-  assert.strictEqual(hy2['skip-cert-verify'], true);
+  assert.strictEqual(hy2['skip-cert-verify'], undefined);
   assert.strictEqual(hy2.obfs, 'salamander');
   assert.strictEqual(hy2['obfs-password'], 'ob1');
+
+  // --- security check: skip-cert-verify is never set from insecure query/json params ---
+  const vlessInsecure = await parsers.parseProxyUrl(
+    'vless://b831381d-6324-4d53-ad4f-8cda48b30811@example.com:443?security=tls&allowInsecure=1&insecure=true#InsecureVLESS'
+  );
+  assert.strictEqual(vlessInsecure['skip-cert-verify'], undefined);
+
+  const vmessInsecureB64 = Buffer.from(JSON.stringify({
+    v: '2', ps: 'Insecure-VMESS', add: 'vmess.example.com', port: '443',
+    id: '12345678-9abc-4def-8123-456789abcde0', tls: 'tls', allowInsecure: true, insecure: 1
+  })).toString('base64');
+  const vmessInsecure = await parsers.parseProxyUrl(`vmess://${vmessInsecureB64}`);
+  assert.strictEqual(vmessInsecure['skip-cert-verify'], undefined);
+
+  const trojanInsecure = await parsers.parseProxyUrl(
+    'trojan://secretpw@tro.example.com:443?allowInsecure=1&insecure=1#InsecureTrojan'
+  );
+  assert.strictEqual(trojanInsecure['skip-cert-verify'], undefined);
+
+  const amneziaVlessInsecureDoc = {
+    containers: [{
+      container: 'amnezia-xray',
+      xray: JSON.stringify({
+        last_config: JSON.stringify({
+          outbounds: [{
+            protocol: 'vless',
+            settings: { vnext: [{ address: '1.2.3.4', port: 443, users: [{ id: 'uuid-123' }] }] },
+            streamSettings: { security: 'tls', tlsSettings: { allowInsecure: true } }
+          }]
+        })
+      })
+    }]
+  };
+  const amneziaVlessInsecure = parsers.parseAmneziaVpnJson(amneziaVlessInsecureDoc);
+  assert.strictEqual(amneziaVlessInsecure['skip-cert-verify'], undefined);
 
   // --- tuic -------------------------------------------------------------------
   const tuic = await parsers.parseProxyUrl(
