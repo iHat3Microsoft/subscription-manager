@@ -1098,12 +1098,24 @@ function applyCustomConfig(baseConfig, userDir, user) {
       for (const key of Object.keys(customConfig)) {
         if (key === 'proxy-groups' && Array.isArray(customConfig[key])) {
           // Сливаем группы прокси по имени
+          if (!Array.isArray(masterConfig['proxy-groups'])) {
+            masterConfig['proxy-groups'] = [];
+          }
+          const groupMap = new Map();
+          for (const g of masterConfig['proxy-groups']) {
+            if (g && g.name && !groupMap.has(g.name)) {
+              groupMap.set(g.name, g);
+            }
+          }
           for (const cg of customConfig[key]) {
-            const existingGroup = masterConfig['proxy-groups'].find(g => g.name === cg.name);
+            const existingGroup = cg && cg.name ? groupMap.get(cg.name) : null;
             if (existingGroup) {
               Object.assign(existingGroup, cg);
             } else {
               masterConfig['proxy-groups'].push(cg);
+              if (cg && cg.name) {
+                groupMap.set(cg.name, cg);
+              }
             }
           }
         } else if (key === 'rules' && Array.isArray(customConfig[key])) {
