@@ -33,19 +33,19 @@ async function testDns() {
 
 async function testTun() {
   const stableTun = build.buildTun([], { experimental: false });
-  assert.strictEqual(stableTun.stack, 'mixed');
+  assert.strictEqual(stableTun.stack, undefined, 'stack must be omitted for backward compatibility');
   assert.strictEqual(stableTun['inet6-address'], undefined);
   assert.ok(stableTun['route-exclude-address'].includes('::/127'));
   assert.ok(stableTun['route-exclude-address'].includes('ff00::/8'));
 
   const expTun = build.buildTun([], { experimental: true });
-  assert.strictEqual(expTun.stack, 'mips');
+  assert.strictEqual(expTun.stack, undefined, 'stack must be omitted for backward compatibility');
   assert.deepStrictEqual(expTun['inet6-address'], ['fdfe:dcba:9876::1/126']);
   assert.strictEqual(expTun['route-exclude-address'].includes('::/127'), false);
   assert.strictEqual(expTun['route-exclude-address'].includes('ff00::/8'), false);
   assert.ok(expTun['route-exclude-address'].includes('fc00::/7'));
 
-  console.log('ok - TUN stack and IPv6 sinkhole verified');
+  console.log('ok - TUN stack omission and IPv6 sinkhole verified');
 }
 
 async function testSniffer() {
@@ -170,14 +170,14 @@ async function testRules() {
 async function testGenerateConfig() {
   const stable = build.generateConfig('User1', 'http://ru', 'http://foreign', [], { experimental: false });
   assert.strictEqual(stable.ipv6, false);
-  assert.strictEqual(stable.tun.stack, 'mixed');
+  assert.strictEqual(stable.tun.stack, undefined);
   assert.ok(Array.isArray(stable.proxies), 'proxies must be an array');
   assert.ok(stable.proxies.some(p => p.name === 'Без VPN (напрямую)' && p.type === 'direct'), 'Без VPN (напрямую) direct proxy must exist');
   assert.ok(stable.proxies.some(p => p.name === 'Блокировать' && p.type === 'reject'), 'Блокировать reject proxy must exist');
 
   const exp = build.generateConfig('User1', 'http://ru', 'http://foreign', [], { experimental: true });
   assert.strictEqual(exp.ipv6, true);
-  assert.strictEqual(exp.tun.stack, 'mips');
+  assert.strictEqual(exp.tun.stack, undefined);
 
   console.log('ok - generateConfig stable vs experimental verified');
 }
@@ -226,6 +226,44 @@ async function testIosDetection() {
   console.log('ok - iOS user detection verified');
 }
 
+async function testUserTimer() {
+  const tmpDir = path.join(__dirname, 'tmp-timer-test');
+  fs.mkdirSync(tmpDir, { recursive: true });
+
+  try {
+    // 1. None
+    assert.strictEqual(build.parseUserTimer(tmpDir), null);
+
+    // 2. 7 days relative
+    fs.writeFileSync(path.join(tmpDir, 'timer.txt'), '7d\n');
+    const res7d = build.parseUserTimer(tmpDir);
+    assert.ok(res7d.includes('total=1099511627776; expire='));
+    const exp7d = parseInt(res7d.match(/expire=(\d+)/)[1], 10);
+    const now = Math.floor(Date.now() / 1000);
+    assert.ok(exp7d >= now + 6 * 86400 && exp7d <= now + 8 * 86400);
+
+    // 3. 30d with 50GB
+    fs.writeFileSync(path.join(tmpDir, 'timer.txt'), '30d 50GB\n');
+    const res30d = build.parseUserTimer(tmpDir);
+    assert.ok(res30d.includes('total=53687091200; expire='));
+
+    // 4. Exact date
+    fs.writeFileSync(path.join(tmpDir, 'timer.txt'), '2026-11-20\n');
+    const resDate = build.parseUserTimer(tmpDir);
+    const expDate = parseInt(resDate.match(/expire=(\d+)/)[1], 10);
+    assert.strictEqual(expDate, Math.floor(new Date('2026-11-20').getTime() / 1000));
+
+    // 5. custom.yaml
+    fs.unlinkSync(path.join(tmpDir, 'timer.txt'));
+    fs.writeFileSync(path.join(tmpDir, 'custom.yaml'), 'plan: 14d\ntraffic: 100GB\n');
+    const resCustom = build.parseUserTimer(tmpDir);
+    assert.ok(resCustom.includes('total=107374182400; expire='));
+  } finally {
+    fs.rmSync(tmpDir, { recursive: true, force: true });
+  }
+  console.log('ok - User timer & traffic limits verified');
+}
+
 async function main() {
   await testDns();
   await testTun();
@@ -236,6 +274,7 @@ async function main() {
   await testGenerateConfig();
   await testBuildMode();
   await testIosDetection();
+  await testUserTimer();
   console.log('build: all assertions passed');
 }
 

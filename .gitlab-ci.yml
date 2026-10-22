@@ -8,6 +8,7 @@ deploy:production:
     - if: '$CI_COMMIT_BRANCH == "master"'
       changes:
         - src/**/*
+        - templates/**/*
         - package.json
         - .gitlab-ci.yml
   before_script:
@@ -46,5 +47,7 @@ deploy:production:
     - ssh-keyscan -p "${DEPLOY_PORT:-22}" "$DEPLOY_HOST" >> ~/.ssh/known_hosts 2>/dev/null || true
     - chmod 644 ~/.ssh/known_hosts 2>/dev/null || true
 
-    # 3. Синхронизация файлов в src/ (без выполнения сборщика от имени deploy-bot)
+    # 3. Синхронизация файлов в src/ и templates/
     - rsync -avz -e "ssh -p ${DEPLOY_PORT:-22} -o StrictHostKeyChecking=accept-new" src/build.js src/parsers.js "${DEPLOY_USER:-deploy-bot}@${DEPLOY_HOST}:${DEPLOY_PATH:-/opt/subscription-manager}/src/"
+    - rsync -avz -e "ssh -p ${DEPLOY_PORT:-22} -o StrictHostKeyChecking=accept-new" templates/ "${DEPLOY_USER:-deploy-bot}@${DEPLOY_HOST}:${DEPLOY_PATH:-/opt/subscription-manager}/templates/"
+    - rsync -avz -e "ssh -p ${DEPLOY_PORT:-22} -o StrictHostKeyChecking=accept-new" templates/sub.html "${DEPLOY_USER:-deploy-bot}@${DEPLOY_HOST}:${DEPLOY_PATH:-/opt/subscription-manager}/public/sub.html"

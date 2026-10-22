@@ -263,7 +263,6 @@ function buildTun(excludePackages, options = {}) {
 
   const tun = {
     enable: true,
-    stack: isExp ? 'mips' : 'mixed',
     'auto-route': true,
     'auto-detect-interface': true,
     'dns-hijack': ['any:53', 'tcp://any:53'],
@@ -1001,6 +1000,93 @@ function getAdblockPreference(userDir, isIos) {
   return DEFAULT_ADBLOCK;
 }
 
+function parseUserTimer(userDir) {
+  const timerFile = path.join(userDir, 'timer.txt');
+  const customFile = path.join(userDir, 'custom.yaml');
+  let rawTimer = null;
+  let rawTraffic = null;
+
+  if (fs.existsSync(timerFile)) {
+    rawTimer = fs.readFileSync(timerFile, 'utf8').trim();
+  } else if (fs.existsSync(customFile)) {
+    try {
+      const cfg = yaml.load(fs.readFileSync(customFile, 'utf8'));
+      if (cfg && (cfg.timer || cfg.expire || cfg.plan)) {
+        rawTimer = String(cfg.timer || cfg.expire || cfg.plan).trim();
+      }
+      if (cfg && (cfg.traffic || cfg.total)) {
+        rawTraffic = String(cfg.traffic || cfg.total).trim();
+      }
+    } catch {
+      // ignore
+    }
+  }
+
+  if (!rawTimer && !rawTraffic) {
+    return null;
+  }
+
+  let totalBytes = 1099511627776; // default 1 TB
+  if (rawTraffic) {
+    const m = String(rawTraffic).match(/^(\d+(?:\.\d+)?)\s*(tb|t|gb|g|mb|m)?$/i);
+    if (m) {
+      const val = parseFloat(m[1]);
+      const unit = (m[2] || 'gb').toLowerCase();
+      if (unit.startsWith('t')) totalBytes = Math.round(val * 1024 * 1024 * 1024 * 1024);
+      else if (unit.startsWith('g')) totalBytes = Math.round(val * 1024 * 1024 * 1024);
+      else if (unit.startsWith('m')) totalBytes = Math.round(val * 1024 * 1024);
+    }
+  }
+
+  let expireSeconds = 1893456000; // default 2030-01-01 (unlimited)
+  if (rawTimer) {
+    const parts = rawTimer.split(/\s+/);
+    for (const part of parts) {
+      const trfMatch = part.match(/^(\d+(?:\.\d+)?)(tb|t|gb|g|mb|m)$/i);
+      if (trfMatch && !rawTraffic) {
+        const val = parseFloat(trfMatch[1]);
+        const unit = trfMatch[2].toLowerCase();
+        if (unit.startsWith('t')) totalBytes = Math.round(val * 1024 * 1024 * 1024 * 1024);
+        else if (unit.startsWith('g')) totalBytes = Math.round(val * 1024 * 1024 * 1024);
+        else if (unit.startsWith('m')) totalBytes = Math.round(val * 1024 * 1024);
+        continue;
+      }
+
+      const durMatch = part.match(/^(\d+)([dhmy])$/i);
+      if (durMatch) {
+        const count = parseInt(durMatch[1], 10);
+        const unit = durMatch[2].toLowerCase();
+        let seconds = 0;
+        if (unit === 'h') seconds = count * 3600;
+        else if (unit === 'd') seconds = count * 86400;
+        else if (unit === 'm') seconds = count * 30 * 86400;
+        else if (unit === 'y') seconds = count * 365 * 86400;
+
+        const startedFile = path.join(userDir, '.started_at');
+        let startedAt;
+        if (fs.existsSync(startedFile)) {
+          startedAt = parseInt(fs.readFileSync(startedFile, 'utf8').trim(), 10);
+          if (isNaN(startedAt)) startedAt = Math.floor(Date.now() / 1000);
+        } else {
+          startedAt = Math.floor(Date.now() / 1000);
+          fs.writeFileSync(startedFile, String(startedAt), { mode: 0o600 });
+        }
+        expireSeconds = startedAt + seconds;
+        continue;
+      }
+
+      if (/^\d{4}-\d{2}-\d{2}/.test(part)) {
+        const d = new Date(part);
+        if (!isNaN(d.getTime())) {
+          expireSeconds = Math.floor(d.getTime() / 1000);
+        }
+      }
+    }
+  }
+
+  return `upload=0; download=0; total=${totalBytes}; expire=${expireSeconds}`;
+}
+
 function applyCustomConfig(baseConfig, userDir, user) {
   const masterConfig = JSON.parse(JSON.stringify(baseConfig));
   const customPath = path.join(userDir, 'custom.yaml');
@@ -1102,6 +1188,8 @@ async function buildAll(overrideArg) {
       console.warn(`[warn] test target '${TEST_USER}' not found in data/. Available: ${users.join(', ')}`);
     }
   }
+
+  const subInfoMap = {};
 
   for (const user of usersToProcess) {
     const userDir = path.join(DATA_DIR, user);
@@ -1220,6 +1308,14 @@ async function buildAll(overrideArg) {
     const masterConfig = applyCustomConfig(rawMaster, userDir, user);
     fs.writeFileSync(configPath, yaml.dump(masterConfig, { indent: 2, lineWidth: -1 }));
 
+    const subInfo = parseUserTimer(userDir);
+    if (subInfo) {
+      subInfoMap[`~*/configs/${token}$`] = subInfo;
+      if (isTest) {
+        subInfoMap[`~*/configs/${token}_stable$`] = subInfo;
+      }
+    }
+
     if (isTest) {
       // Для тестера генерируем стабильную версию (${token}_stable) как подушку безопасности
       const rawStable = generateConfig(
@@ -1242,6 +1338,24 @@ async function buildAll(overrideArg) {
       console.log(`  -> Subscription Link: ${BASE_URL}/configs/${token} [${isUserExp ? 'EXPERIMENTAL' : 'STABLE'}]`);
     }
   }
+
+  const subInfoMapPath = path.join(PUBLIC_DIR, '.sub_info.map');
+  let finalSubInfo = {};
+  if (rawArg === 'test' && fs.existsSync(subInfoMapPath)) {
+    for (const line of fs.readFileSync(subInfoMapPath, 'utf8').split('\n')) {
+      const m = line.trim().match(/^(\S+)\s+"([^"]+)";/);
+      if (m) finalSubInfo[m[1]] = m[2];
+    }
+  }
+  Object.assign(finalSubInfo, subInfoMap);
+  const mapLines = Object.entries(finalSubInfo).map(([k, v]) => `${k} "${v}";`);
+  fs.writeFileSync(subInfoMapPath, mapLines.length > 0 ? mapLines.join('\n') + '\n' : '# subscription map\n', 'utf8');
+
+  const templateHtml = path.join(__dirname, '..', 'templates', 'sub.html');
+  const targetHtml = path.join(PUBLIC_DIR, 'sub.html');
+  if (fs.existsSync(templateHtml)) {
+    fs.copyFileSync(templateHtml, targetHtml);
+  }
 }
 
 module.exports = {
@@ -1257,6 +1371,7 @@ module.exports = {
   setStoredBuildMode,
   isIosUser,
   getAdblockPreference,
+  parseUserTimer,
   buildAll
 };
 

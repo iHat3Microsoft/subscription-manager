@@ -106,7 +106,7 @@ but was never pushed to GitLab. Some changes may be lost. TODO:
 - Состояние режима хранится в `data/.build-mode.json` (`stable` | `test` | `promoted`).
 - **`buildvpn test` (или `node src/build.js test`):**
   - Пересобирает **только** профиль тестера (`TEST_USER`, по умолчанию `Me`) — не трогает и не перезаписывает 20+ других пользователей.
-  - Для `Me` генерирует основной файл `${token}` с новыми экспериментальными фичами (`stack: mips`, IPv6 blackhole, `sticky-sessions` балансировка по умолчанию).
+  - Для `Me` генерирует основной файл `${token}` с новыми экспериментальными фичами (IPv6 blackhole, `sticky-sessions` балансировка по умолчанию).
   - Для него же генерирует аварийный файл `${token}_stable` с проверенными стабильными параметрами.
   - Физическая папка `data/Me` **не клонируется**, сохраняя единый источник ключей.
 - **`buildvpn revert`:** мгновенный откат всех профилей на стабильный конфиг.
@@ -142,5 +142,5 @@ but was never pushed to GitLab. Some changes may be lost. TODO:
 
 #### Е. Специфика версий Mihomo:
 - `global-client-fingerprint` в Mihomo v1.19.x удален из корня конфига (вызывает `3008error`). `client-fingerprint` задается внутри настроек конкретных прокси-узлов.
-- `stack: mips` (Mihomo IP Stack) — валидный и рекомендуемый userspace-стек Mihomo (не путать с архитектурой CPU).
+- `tun.stack`: намеренно не указывается в генерируемом конфиге. Новые клиенты (v1.19.32+) автоматически подставляют дефолтный `mips` (Mihomo IP Stack), а старые клиенты (до v1.19.31) — дефолтный `gvisor`. Явное указание `stack: mips` приводило к сбою обновления на старых версиях.
 - `strategy: sticky-sessions` автоматически склеивает поддомены по eTLD+1 и кэширует сессию на 10 минут.

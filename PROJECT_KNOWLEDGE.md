@@ -87,7 +87,7 @@ header /configs/* Subscription-Userinfo "upload=0; download=0; total=10995116277
   - Физическая папка `data/Me` **не клонируется**, сохраняя единый источник ключей.
   - Состояние сборщика хранится в `data/.build-mode.json` (`stable` | `test` | `promoted`).
   - Команда `buildvpn test` (или `node src/build.js test`):
-    - Для тестового профиля (`Me` или `TEST_USER`) генерирует **основной** конфиг `public/configs/${token}` с экспериментальными параметрами (`stack: mips`, IPv6 blackhole, sticky-sessions).
+    - Для тестового профиля (`Me` или `TEST_USER`) генерирует **основной** конфиг `public/configs/${token}` с экспериментальными параметрами (IPv6 blackhole, sticky-sessions).
     - Для него же генерирует **стабильный резерв** `public/configs/${token}_stable` с проверенными параметрами.
     - Все остальные пользователи получают исключительно стабильный проверенный конфиг.
   - Команда `buildvpn revert`: мгновенный откат всех пользователей (включая `Me`) на стабильный профиль.
@@ -102,8 +102,8 @@ header /configs/* Subscription-Userinfo "upload=0; download=0; total=10995116277
   - В `default-nameserver` оставлены только чистые IP (`77.88.8.8`, `94.140.14.140`).
   - Включен `cache-algorithm: arc` и убран невалидный `prefer-ipv4`.
 
-### 3. TUN: Стек `mips` и защита от утечки IPv6 (Blackhole)
-- **Стек:** В экспериментальном/промотированном режиме используется `stack: mips` (Mihomo IP Stack). Он работает полностью в userspace и не блокируется брандмауэром Windows.
+### 3. TUN: Совместимость стеков и защита от утечки IPv6 (Blackhole)
+- **Стек:** Параметр `tun.stack` намеренно опущен в генераторе `src/build.js`. Современные версии Mihomo (v1.19.32+) используют по умолчанию встроенный `stack: mips`, а устаревшие клиенты (до v1.19.31) — дефолтный `gvisor`. Это устраняет ошибки загрузки подписок на старых клиентах без потери преимуществ на новых.
 - **Утечка IPv6:** На мобильных операторах и провайдерах с dual-stack трафик IPv6 утекал мимо TUN. Решено через sinkhole:
   - В корне: `ipv6: true` (разрешает захват IPv6 в TUN).
   - В `dns`: `ipv6: false` (Mihomo не резолвит AAAA).

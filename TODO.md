@@ -504,8 +504,8 @@ rule-provider с `PROCESS-NAME` для Windows/Linux/macOS exe
   - Очищены ключевые слова AI (`grok.com`, `x.ai`, `copilot.microsoft.com`).
   - `geosite-meta` перенесен в `👥 Facebook`.
   - Все IP-правила (`discord_voiceips`, `telegram-ips`, `facebook-ips`, `IP-ASN,32934`, `google-geoip`, `GEOIP,RU`, `rknasnblock`) перенесены в конец перед `MATCH` строго с флагом `no-resolve`.
-- [x] **Стек `mips` и IPv6 Blackhole через TUN:**
-  - В experimental/promote включен `stack: mips`.
+- [x] **Отказ от явного указания `tun.stack` и IPv6 Blackhole через TUN:**
+  - `stack` не указывается в конфиге: новые клиенты (v1.19.32+) автоматически используют свой дефолт `mips`, а старые клиенты (до v1.19.31) — дефолт `gvisor`, что предотвращает ошибки парсинга при обновлении.
   - В корне `ipv6: true`, в `dns` `ipv6: false`, в `tun` добавлен `inet6-address: [fdfe:dcba:9876::1/126]`, первым правилом стоит `IP-CIDR6,::/0,REJECT-DROP,no-resolve`.
 - [x] **Балансировка `sticky-sessions`:**
   - Добавлена группа `⚖️ Балансировка (Иностранные)` (тип `load-balance`, стратегия `sticky-sessions`) в `proxy-groups`.
@@ -593,4 +593,15 @@ rule-provider с `PROCESS-NAME` для Windows/Linux/macOS exe
 - **Задача:** Провести ревизию всех 97 правил в `my-rules.yaml`.
   1. Закомментировать или удалить тестовые чекеры (`browserleaks.com`, `dnsleaktest.com`), чтобы они не использовались трекерами и фингерпринтерами для выявления туннеля.
   2. Перевести классические правила в формат `.mrs`, где это возможно, для оптимизации скорости матчинга.
+
+### [TODO-8] Десктопная изоляция Яндекс.Браузера и шпионского ПО (Windows/Mac/Linux)
+- **Контекст:** На Android приложения блокируются нативно через `tun.exclude-package`. На ПК нужен точечный перехват исполняемых файлов.
+- **Задача:** Добавить в `my-rules.yaml` процессные правила (`PROCESS-NAME,browser.exe,DIRECT`, `PROCESS-NAME,yandex.exe,DIRECT`), чтобы браузер не имел доступа в туннель.
+
+---
+
+## Подробная дорожная карта и архитектура будущего
+Детальный план по Zero-Trust безопасности серверов, Telegram-боту, Omarchy Matte Black WebApp и безопасной генерации ключей без SSH вынесен в:
+👉 **`FUTURE_PLANS.md`**
+
 
