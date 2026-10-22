@@ -4,7 +4,10 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Подключение VPN</title>
-    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%23c98218'><rect width='24' height='24' fill='%23090909'/><path d='M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 17.93c-3.95-.49-7-3.85-7-7.93 0-.62.08-1.21.21-1.79L9 15v1c0 1.1.9 2 2 2v1.93zm6.9-2.54c-.26-.81-1-1.39-1.9-1.39h-1v-3c0-.55-.45-1-1-1H8v-2h2c.55 0 1-.45 1-1V7h2c1.1 0 2-.9 2-2v-.41c2.93 1.19 5 4.06 5 7.41 0 2.08-.8 3.97-2.1 5.39z' fill='%23c98218'/></svg>">
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%23e58e0a'><rect width='24' height='24' fill='%23090909'/><path d='M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 17.93c-3.95-.49-7-3.85-7-7.93 0-.62.08-1.21.21-1.79L9 15v1c0 1.1.9 2 2 2v1.93zm6.9-2.54c-.26-.81-1-1.39-1.9-1.39h-1v-3c0-.55-.45-1-1-1H8v-2h2c.55 0 1-.45 1-1V7h2c1.1 0 2-.9 2-2v-.41c2.93 1.19 5 4.06 5 7.41 0 2.08-.8 3.97-2.1 5.39z' fill='%23e58e0a'/></svg>">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <style>
         :root {
             /* Палитра Omarchy Matte Black / Nautilus */
@@ -28,11 +31,11 @@
             --text-muted: #8d939e;
             --text-disabled: #555555;
 
-            /* Приглушённый матовый янтарь / тёплая бронза */
-            --accent-primary: #c98218;
-            --accent-hover: #db9226;
-            --accent-bright: #e8a035;
-            --accent-surface: #382205;
+            /* Насыщенный матовый янтарь / теплое золото */
+            --accent-primary: #e58e0a;
+            --accent-hover: #f59e0b;
+            --accent-bright: #fbbf24;
+            --accent-surface: #3d2403;
             --accent-fg: #0a0a0a;
 
             --status-success: #9ece6a;
@@ -50,14 +53,14 @@
         }
 
         body {
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Inter, Helvetica, Arial, sans-serif;
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
             background-color: var(--bg-deepest);
             color: var(--text-primary);
             min-height: 100vh;
             display: flex;
-            align-items: center;
+            align-items: flex-start;
             justify-content: center;
-            padding: 20px;
+            padding: 48px 16px 64px;
         }
 
         .container {
@@ -285,7 +288,7 @@
             font-weight: 600;
             text-transform: uppercase;
             letter-spacing: 0.04em;
-            border: 1px solid rgba(201, 130, 24, 0.3);
+            border: 1px solid rgba(229, 142, 10, 0.3);
         }
 
         .app-desc {
@@ -535,7 +538,7 @@
                         { name: 'Clash Mi', desc: 'Альтернативный клиент', url: 'https://github.com/KaringX/clashmi' }
                     ],
                     steps: [
-                        'Установите Clash Meta for Android (из F-Droid) или FlClash.',
+                        'Установите клиент.',
                         'Нажмите «Подключить в приложение» (или скопируйте ссылку).',
                         'Разрешите добавление VPN-профиля и включите переключатель.'
                     ]
@@ -562,7 +565,7 @@
                         { name: 'Clash Mi', desc: 'Клиент на базе Mihomo', url: 'https://github.com/KaringX/clashmi' }
                     ],
                     steps: [
-                        'Установите FlClash или Clash Verge Rev.',
+                        'Установите клиент.',
                         'Нажмите «Подключить в приложение».',
                         'Включите системный прокси (System Proxy) или режим TUN.'
                     ]
@@ -588,7 +591,7 @@
                         { name: 'FlClashX', desc: 'Форк FlClash', url: 'https://github.com/pluralplay/FlClashX/releases' }
                     ],
                     steps: [
-                        'Установите Clash Verge Rev или FlClash.',
+                        'Установите клиент.',
                         'Нажмите «Подключить в приложение» и разрешите Helper Tool.',
                         'Активируйте системный прокси в интерфейсе приложения.'
                     ]
@@ -609,14 +612,14 @@
                         }
                     ],
                     others: [
-                        { name: 'AUR: mihomo-bin', desc: 'yay -S mihomo-bin (консольный демон)', url: 'https://aur.archlinux.org/packages/mihomo-bin' },
+                        { name: 'AUR: mihomo-bin', desc: 'cli версия без гуи (yay -S mihomo-bin)', url: 'https://aur.archlinux.org/packages/mihomo-bin' },
                         { name: 'Prizrak-Box', desc: 'Сборка от Legiz', url: 'https://github.com/legiz-ru/Prizrak-Box/releases' },
                         { name: 'FlClashX', desc: 'Форк FlClash', url: 'https://github.com/pluralplay/FlClashX/releases' }
                     ],
                     steps: [
-                        'Установите Clash Verge Rev (или из AUR: yay -S mihomo-bin).',
+                        'Установите клиент.',
                         'Импортируйте ссылку подписки в клиент.',
-                        'Активируйте TUN Mode (требуются права root/cap_net_admin).'
+                        'В клиенте включите режим TUN, оставьте System Proxy выключенным.'
                     ]
                 },
                 ios: {
@@ -636,7 +639,7 @@
                     ],
                     others: [],
                     steps: [
-                        'Установите Clash Mi или Rabbit Hole из App Store.',
+                        'Установите клиент.',
                         'Нажмите «Подключить в приложение».',
                         'Разрешите добавление VPN-конфигурации в настройках iOS.'
                     ]

@@ -598,6 +598,17 @@ rule-provider с `PROCESS-NAME` для Windows/Linux/macOS exe
 - **Контекст:** На Android приложения блокируются нативно через `tun.exclude-package`. На ПК нужен точечный перехват исполняемых файлов.
 - **Задача:** Добавить в `my-rules.yaml` процессные правила (`PROCESS-NAME,browser.exe,DIRECT`, `PROCESS-NAME,yandex.exe,DIRECT`), чтобы браузер не имел доступа в туннель.
 
+### [FEATURE-9] Поддержка Web-интерфейса Zashboard в custom.yaml
+- **Контекст:** Управление ядром Mihomo через веб-интерфейс Zashboard без использования тяжелых сторонних GUI.
+- **Строки для добавления в `data/<user>/custom.yaml`:**
+  ```yaml
+  external-controller: 127.0.0.1:<СГЕНЕРИРОВАННЫЙ_СЛУЧАЙНЫЙ_ПОРТ>
+  external-ui: ./ui
+  external-ui-url: https://github.com/Zephyruso/zashboard/releases/latest/download/dist-cdn-fonts.zip
+  secret: "<СЕКРЕТ_ИЛИ_ПАРОЛЬ_ПОЛЬЗОВАТЕЛЯ>"
+  ```
+- **Задача:** Добавить автоматическую генерацию этих 4-х параметров в `build.js` / Telegram-бот по флагу пользователя (или через команду `/zashboard on`).
+
 ---
 
 ## Подробная дорожная карта и архитектура будущего

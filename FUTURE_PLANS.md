@@ -69,3 +69,17 @@
 - Запросы браузеров на `/configs/<TOKEN>` отдают веб-страницу `sub.html` с `Content-Type: text/html` без заголовка `Content-Disposition: attachment`.
 - VPN-клиенты (Clash Meta, FlClash, Verge) получают чистый YAML с `Content-Disposition: attachment; filename="$sub_filename"`.
 - Лимиты и таймеры берутся из автогенерируемого файла `public/.sub_info.map`.
+
+---
+
+## 5. Web-интерфейс Zashboard через `custom.yaml`
+
+Для пользователей, желающих управлять маршрутизацией через браузер без стороннего GUI:
+В `data/<user>/custom.yaml` добавляются параметры:
+```yaml
+external-controller: 127.0.0.1:<RANDOM_HIGH_PORT>
+external-ui: ./ui
+external-ui-url: https://github.com/Zephyruso/zashboard/releases/latest/download/dist-cdn-fonts.zip
+secret: "<USER_SECRET>"
+```
+При запуске ядро Mihomo само скачивает Zashboard в папку `./ui` и поднимает веб-панель на локальном порту пользователя с защитой паролем `secret`.
