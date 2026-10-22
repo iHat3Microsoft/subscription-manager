@@ -8,7 +8,7 @@
     "build:test": "node src/build.js test",
     "build:revert": "node src/build.js revert",
     "build:promote": "node src/build.js promote",
-    "test": "node --check src/build.js && node --check src/parsers.js && node tests/test_parsers.js && node tests/test_build_output.js && bash tests/test_shell_helpers.sh"
+    "test": "node --check src/build.js && node --check src/parsers.js && node --check src/test-config.builder.js && node tests/test_parsers.js && node tests/test_build_output.js && bash tests/test_shell_helpers.sh"
   },
   "keywords": [
     "mihomo",
