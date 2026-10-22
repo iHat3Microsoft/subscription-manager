@@ -95,8 +95,8 @@ async function parseProxy(content, baseName) {
       const p = parsers.parseAmneziaVpnJson(json);
       if (p) return p;
     }
-  } catch {
-    // Not JSON
+  } catch (e) {
+    // Content is not valid JSON; fall through safely to URL or WireGuard INI parsers
   }
 
   // Try HTTP subscription URL -> inline ingest of Marzban-style YAML.
