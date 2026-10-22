@@ -67,7 +67,18 @@ async function main() {
   assert.strictEqual(tuic['congestion-controller'], 'bbr');
   assert.strictEqual(tuic['udp-relay-mode'], 'native');
 
-  // --- ss: base64 userinfo ------------------------------------------------------
+  // --- ss tests ------------------------------------------------------------------
+  // 1. Plain userinfo
+  const ssPlain = parsers.parseSS('ss://aes-128-gcm:mypassword@ss.example.com:8388#PlainSS');
+  assert.strictEqual(ssPlain.type, 'ss');
+  assert.strictEqual(ssPlain.name, 'PlainSS');
+  assert.strictEqual(ssPlain.cipher, 'aes-128-gcm');
+  assert.strictEqual(ssPlain.password, 'mypassword');
+  assert.strictEqual(ssPlain.server, 'ss.example.com');
+  assert.strictEqual(ssPlain.port, 8388);
+  assert.strictEqual(ssPlain.udp, true);
+
+  // 2. Base64 userinfo
   const ssUserinfo = Buffer.from('aes-256-gcm:sspass').toString('base64');
   const ss = await parsers.parseProxyUrl(`ss://${ssUserinfo}@ss.example.com:8388#SS`);
   assert.strictEqual(ss.type, 'ss');
@@ -75,6 +86,65 @@ async function main() {
   assert.strictEqual(ss.password, 'sspass');
   assert.strictEqual(ss.server, 'ss.example.com');
   assert.strictEqual(ss.port, 8388);
+
+  // 3. Base64 full host (legacy format)
+  const ssFullB64 = Buffer.from('2022-blake3-aes-128-gcm:mypass@ss.example.com:8388').toString('base64');
+  const ssFull = parsers.parseSS(`ss://${ssFullB64}#FullB64SS`);
+  assert.strictEqual(ssFull.type, 'ss');
+  assert.strictEqual(ssFull.name, 'FullB64SS');
+  assert.strictEqual(ssFull.cipher, '2022-blake3-aes-128-gcm');
+  assert.strictEqual(ssFull.password, 'mypass');
+  assert.strictEqual(ssFull.server, 'ss.example.com');
+  assert.strictEqual(ssFull.port, 8388);
+
+  // 4. Fallback name when hash fragment is absent
+  const ssNoTag = parsers.parseSS(`ss://${ssUserinfo}@ss.example.com:8388`);
+  assert.strictEqual(ssNoTag.name, 'ss-ss.example.com');
+
+  // 5. Query parameter options: udp-over-tcp and uot
+  const ssUot1 = parsers.parseSS(`ss://${ssUserinfo}@ss.example.com:8388?udp-over-tcp=1#SS-UOT`);
+  assert.strictEqual(ssUot1['udp-over-tcp'], true);
+
+  const ssUot2 = parsers.parseSS(`ss://${ssUserinfo}@ss.example.com:8388?uot=1#SS-UOT2`);
+  assert.strictEqual(ssUot2['udp-over-tcp'], true);
+
+  // 6. Plugin options: obfs
+  const ssObfs = parsers.parseSS(
+    `ss://${ssUserinfo}@ss.example.com:8388?plugin=obfs-local%3Bobfs%3Dhttp%3Bobfs-host%3Dexample.com#SS-OBFS`
+  );
+  assert.strictEqual(ssObfs.plugin, 'obfs');
+  assert.deepStrictEqual(ssObfs['plugin-opts'], { mode: 'http', host: 'example.com' });
+
+  // 7. Plugin options: v2ray-plugin with TLS
+  const ssV2rayTls = parsers.parseSS(
+    `ss://${ssUserinfo}@ss.example.com:8388?plugin=v2ray-plugin%3Bmode%3Dwebsocket%3Bhost%3Dexample.com%3Bpath%3D%2Fws%3Btls#SS-V2RAY`
+  );
+  assert.strictEqual(ssV2rayTls.plugin, 'v2ray-plugin');
+  assert.deepStrictEqual(ssV2rayTls['plugin-opts'], {
+    mode: 'websocket',
+    host: 'example.com',
+    path: '/ws',
+    tls: true
+  });
+
+  // 8. Plugin options: v2ray-plugin without TLS
+  const ssV2rayNoTls = parsers.parseSS(
+    `ss://${ssUserinfo}@ss.example.com:8388?plugin=v2ray-plugin%3Bmode%3Dwebsocket%3Bhost%3Dexample.com%3Bpath%3D%2Fws#SS-V2RAY-NOTLS`
+  );
+  assert.strictEqual(ssV2rayNoTls.plugin, 'v2ray-plugin');
+  assert.strictEqual(ssV2rayNoTls['plugin-opts'].tls, false);
+
+  // 9. Invalid / Malformed inputs return null
+  assert.strictEqual(parsers.parseSS(null), null);
+  assert.strictEqual(parsers.parseSS(''), null);
+  assert.strictEqual(parsers.parseSS('not-a-url'), null);
+  assert.strictEqual(parsers.parseSS('vmess://something'), null);
+  assert.strictEqual(parsers.parseSS('ss://invalid-base64-host'), null);
+  const ssNoColon = Buffer.from('nocolonpassword').toString('base64');
+  assert.strictEqual(parsers.parseSS(`ss://${ssNoColon}@ss.example.com:8388`), null);
+  const ssEmptyCipher = Buffer.from(':mypassword').toString('base64');
+  assert.strictEqual(parsers.parseSS(`ss://${ssEmptyCipher}@ss.example.com:8388`), null);
+  assert.strictEqual(parsers.parseSS('ss://aes-256-gcm:pass@ss.example.com:notaport'), null);
 
   // --- raw WG .conf with Amnezia params -----------------------------------------
   const wgConf = [
