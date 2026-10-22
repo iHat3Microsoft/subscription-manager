@@ -50,4 +50,3 @@ deploy:production:
     # 3. Синхронизация файлов в src/ и templates/
     - rsync -avz -e "ssh -p ${DEPLOY_PORT:-22} -o StrictHostKeyChecking=accept-new" src/build.js src/parsers.js "${DEPLOY_USER:-deploy-bot}@${DEPLOY_HOST}:${DEPLOY_PATH:-/opt/subscription-manager}/src/"
     - rsync -avz -e "ssh -p ${DEPLOY_PORT:-22} -o StrictHostKeyChecking=accept-new" templates/ "${DEPLOY_USER:-deploy-bot}@${DEPLOY_HOST}:${DEPLOY_PATH:-/opt/subscription-manager}/templates/"
-    - rsync -avz -e "ssh -p ${DEPLOY_PORT:-22} -o StrictHostKeyChecking=accept-new" templates/sub.html "${DEPLOY_USER:-deploy-bot}@${DEPLOY_HOST}:${DEPLOY_PATH:-/opt/subscription-manager}/public/sub.html"
