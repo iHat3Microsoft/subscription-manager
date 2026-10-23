@@ -73,50 +73,9 @@ async function testProxyGroups() {
   assert.strictEqual(expForeign.proxies[0], '♻️ Автовыбор', 'Fallback must be default in experimental mode');
   assert.strictEqual(expForeign.proxies[1], '⚡ Параллельно', 'Balancing must be second in experimental mode');
 
-  // Test AWG separation and nested fallback
-  const awgGroups = build.buildProxyGroups({ experimental: true, hasForeignAwg: true, hasRuAwg: true });
-  const foreignAwgGroup = awgGroups.find(g => g.name === 'Amnezia WG 3.1');
-  assert.ok(foreignAwgGroup, 'Amnezia WG 3.1 group must exist when hasForeignAwg: true');
-  assert.strictEqual(foreignAwgGroup.type, 'fallback');
-  assert.strictEqual(foreignAwgGroup.lazy, true);
-  assert.strictEqual(foreignAwgGroup.interval, 1800);
-  assert.deepStrictEqual(foreignAwgGroup.use, ['foreign_awg']);
-
-  const ruAwgGroup = awgGroups.find(g => g.name === 'Amnezia WG 3.1 РФ');
-  assert.ok(ruAwgGroup, 'Amnezia WG 3.1 РФ group must exist when hasRuAwg: true');
-  assert.strictEqual(ruAwgGroup.type, 'fallback');
-  assert.strictEqual(ruAwgGroup.lazy, true);
-  assert.strictEqual(ruAwgGroup.interval, 1800);
-  assert.deepStrictEqual(ruAwgGroup.use, ['ru_awg']);
-
-  const foreignAuto = awgGroups.find(g => g.name === '♻️ Автовыбор');
-  assert.deepStrictEqual(foreignAuto.proxies, ['♻️ Мульти-протокол', 'Amnezia WG 3.1']);
-
-  const ruAuto = awgGroups.find(g => g.name === '♻️ Автовыбор РФ');
-  assert.deepStrictEqual(ruAuto.proxies, ['♻️ Мульти-протокол РФ', 'Amnezia WG 3.1 РФ']);
-
-  const awgLbGroup = awgGroups.find(g => g.name === '⚡ Параллельно');
-  assert.deepStrictEqual(awgLbGroup.use, ['foreign_servers'], 'load-balance must not use AWG');
-
-  const awgForeignSelect = awgGroups.find(g => g.name === '🌍 Зарубежный сервер');
-  assert.deepStrictEqual(awgForeignSelect.proxies, ['♻️ Автовыбор', '⚡ Параллельно', 'Amnezia WG 3.1']);
-  assert.deepStrictEqual(awgForeignSelect.use, ['foreign_servers'], 'Foreign selector must not leak AWG in use');
-
-  const tgGroup = awgGroups.find(g => g.name === '➤ Telegram');
-  assert.deepStrictEqual(tgGroup.use, ['foreign_servers'], 'App selectors must not leak AWG in use');
-
-  const ytGroup = awgGroups.find(g => g.name === '▶️ YouTube');
-  assert.deepStrictEqual(ytGroup.use, ['ru_servers', 'foreign_servers'], 'App selectors must not leak AWG in use');
-  assert.ok(ytGroup.proxies.includes('Amnezia WG 3.1 РФ'), 'YouTube must include Russian AWG option');
-
-  const discordGroup = awgGroups.find(g => g.name === '💬 Discord');
-  assert.ok(discordGroup.proxies.includes('Amnezia WG 3.1 РФ'), 'Discord must include Russian AWG option');
-
-  const ruFirstAwgGroup = awgGroups.find(g => g.name === '♻️ Сначала РФ');
-  assert.deepStrictEqual(ruFirstAwgGroup.proxies, ['♻️ Автовыбор РФ', 'Amnezia WG 3.1 РФ', '♻️ Автовыбор']);
-  assert.strictEqual(ruFirstAwgGroup['max-failed-times'], 1);
-  assert.strictEqual(ruFirstAwgGroup.timeout, 3000);
-  assert.strictEqual(ruFirstAwgGroup.interval, 180);
+  const autoForeign = stableGroups.find(g => g.name === '♻️ Автовыбор');
+  assert.strictEqual(autoForeign.timeout, 3000);
+  assert.strictEqual(autoForeign['max-failed-times'], 1);
 
   const aiGroup = stableGroups.find(g => g.name === '🤖 AI (Нейронки)');
   assert.deepStrictEqual(aiGroup.proxies, ['♻️ Автовыбор', '🌍 Зарубежный сервер']);
