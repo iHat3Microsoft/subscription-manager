@@ -310,36 +310,107 @@ function buildSniffer() {
   };
 }
 
-function httpProxyProvider(url, providerPath) {
+function isAwgProxy(p) {
+  if (!p || typeof p !== 'object') return false;
+  return String(p.type || '').toLowerCase() === 'wireguard';
+}
+
+function httpProxyProvider(url, providerPath, options = {}) {
+  const hcInterval = options.healthCheckInterval || 900;
   return {
     type: 'http',
-    interval: 3600,
+    interval: options.interval || 3600,
     url,
     path: providerPath,
     'health-check': {
       enable: true,
       lazy: true,
-      interval: 900,
+      interval: hcInterval,
       url: 'https://www.gstatic.com/generate_204'
     }
   };
 }
 
-function buildProxyProviders(ruProviderUrl, foreignProviderUrl) {
-  return {
+function buildProxyProviders(ruProviderUrl, foreignProviderUrl, options = {}) {
+  const providers = {
     ru_servers: httpProxyProvider(ruProviderUrl, './proxy-providers/ru_servers.yaml'),
     foreign_servers: httpProxyProvider(foreignProviderUrl, './proxy-providers/foreign_servers.yaml')
   };
+
+  if (options && options.foreignAwgUrl) {
+    providers.foreign_awg = httpProxyProvider(options.foreignAwgUrl, './proxy-providers/foreign_awg.yaml', {
+      interval: 3600,
+      healthCheckInterval: 1800
+    });
+  }
+
+  if (options && options.ruAwgUrl) {
+    providers.ru_awg = httpProxyProvider(options.ruAwgUrl, './proxy-providers/ru_awg.yaml', {
+      interval: 3600,
+      healthCheckInterval: 1800
+    });
+  }
+
+  return providers;
 }
 
 function buildProxyGroups(options = {}) {
   const isExp = Boolean(options.experimental);
-  const foreignProxies = isExp
-    ? ['⚡ Параллельно', '♻️ Автовыбор']
-    : ['♻️ Автовыбор'];
+  const hasForeignAwg = Boolean(options.hasForeignAwg);
+  const hasRuAwg = Boolean(options.hasRuAwg);
 
-  const groups = [
-    {
+  const foreignUse = hasForeignAwg ? ['foreign_servers', 'foreign_awg'] : ['foreign_servers'];
+  const ruUse = hasRuAwg ? ['ru_servers', 'ru_awg'] : ['ru_servers'];
+  const allUse = [...ruUse, ...foreignUse];
+
+  const foreignProxies = ['♻️ Автовыбор'];
+  if (isExp) {
+    foreignProxies.push('⚡ Параллельно');
+  }
+  if (hasForeignAwg) {
+    foreignProxies.push('Amnezia WG 3.1');
+  }
+
+  const groups = [];
+
+  if (hasForeignAwg) {
+    groups.push({
+      name: 'Amnezia WG 3.1',
+      type: 'fallback',
+      hidden: true,
+      lazy: true,
+      url: 'https://www.gstatic.com/generate_204',
+      interval: 1800,
+      timeout: 5000,
+      'max-failed-times': 3,
+      use: ['foreign_awg']
+    });
+
+    groups.push({
+      name: '♻️ Мульти-протокол',
+      type: 'fallback',
+      hidden: true,
+      lazy: true,
+      url: 'https://www.gstatic.com/generate_204',
+      interval: 120,
+      timeout: 5000,
+      'max-failed-times': 3,
+      use: ['foreign_servers']
+    });
+
+    groups.push({
+      name: '♻️ Автовыбор',
+      type: 'fallback',
+      hidden: true,
+      lazy: true,
+      url: 'https://www.gstatic.com/generate_204',
+      interval: 120,
+      timeout: 5000,
+      'max-failed-times': 3,
+      proxies: ['♻️ Мульти-протокол', 'Amnezia WG 3.1']
+    });
+  } else {
+    groups.push({
       name: '♻️ Автовыбор',
       type: 'fallback',
       hidden: true,
@@ -349,8 +420,47 @@ function buildProxyGroups(options = {}) {
       timeout: 5000,
       'max-failed-times': 3,
       use: ['foreign_servers']
-    },
-    {
+    });
+  }
+
+  if (hasRuAwg) {
+    groups.push({
+      name: 'Amnezia WG 3.1 РФ',
+      type: 'fallback',
+      hidden: true,
+      lazy: true,
+      url: 'https://www.gstatic.com/generate_204',
+      interval: 1800,
+      timeout: 5000,
+      'max-failed-times': 3,
+      use: ['ru_awg']
+    });
+
+    groups.push({
+      name: '♻️ Мульти-протокол РФ',
+      type: 'fallback',
+      hidden: true,
+      lazy: true,
+      url: 'https://www.gstatic.com/generate_204',
+      interval: 120,
+      timeout: 5000,
+      'max-failed-times': 3,
+      use: ['ru_servers']
+    });
+
+    groups.push({
+      name: '♻️ Автовыбор РФ',
+      type: 'fallback',
+      hidden: true,
+      lazy: true,
+      url: 'https://www.gstatic.com/generate_204',
+      interval: 120,
+      timeout: 5000,
+      'max-failed-times': 3,
+      proxies: ['♻️ Мульти-протокол РФ', 'Amnezia WG 3.1 РФ']
+    });
+  } else {
+    groups.push({
       name: '♻️ Автовыбор РФ',
       type: 'fallback',
       hidden: true,
@@ -360,19 +470,20 @@ function buildProxyGroups(options = {}) {
       timeout: 5000,
       'max-failed-times': 3,
       use: ['ru_servers']
-    },
-    {
-      name: '♻️ Сначала РФ',
-      type: 'fallback',
-      hidden: true,
-      lazy: true,
-      url: 'https://www.gstatic.com/generate_204',
-      interval: 120,
-      timeout: 5000,
-      'max-failed-times': 3,
-      use: ['ru_servers', 'foreign_servers']
-    }
-  ];
+    });
+  }
+
+  groups.push({
+    name: '♻️ Сначала РФ',
+    type: 'fallback',
+    hidden: true,
+    lazy: true,
+    url: 'https://www.gstatic.com/generate_204',
+    interval: 120,
+    timeout: 5000,
+    'max-failed-times': 3,
+    proxies: ['♻️ Автовыбор РФ', '♻️ Автовыбор']
+  });
 
   if (isExp) {
     groups.push({
@@ -389,34 +500,39 @@ function buildProxyGroups(options = {}) {
     });
   }
 
+  const ruProxiesList = ['♻️ Автовыбор РФ'];
+  if (hasRuAwg) {
+    ruProxiesList.push('Amnezia WG 3.1 РФ');
+  }
+
   groups.push(
     {
       name: '🌍 Зарубежный сервер',
       type: 'select',
       icon: 'https://cdn.jsdelivr.net/gh/Koolson/Qure@master/IconSet/Color/Global.png',
       proxies: foreignProxies,
-      use: ['foreign_servers']
+      use: foreignUse
     },
     {
       name: '🌐 Остальной трафик',
       type: 'select',
       icon: 'https://cdn.jsdelivr.net/gh/Koolson/Qure@master/IconSet/Color/Auto.png',
       proxies: ['Без VPN (напрямую)', '🌍 Зарубежный сервер'],
-      use: ['foreign_servers']
+      use: foreignUse
     },
     {
       name: '▶️ YouTube',
       type: 'select',
       icon: 'https://cdn.jsdelivr.net/gh/Koolson/Qure@master/IconSet/Color/YouTube.png',
       proxies: ['♻️ Сначала РФ', '🌍 Зарубежный сервер', 'Без VPN (напрямую)'],
-      use: ['ru_servers', 'foreign_servers']
+      use: allUse
     },
     {
       name: '🔎 Google',
       type: 'select',
       icon: 'https://cdn.jsdelivr.net/gh/Koolson/Qure@master/IconSet/Color/Google_Search.png',
       proxies: ['Без VPN (напрямую)', '♻️ Автовыбор', '🌍 Зарубежный сервер'],
-      use: ['foreign_servers']
+      use: foreignUse
     },
     {
       name: '🚫 Реклама',
@@ -429,14 +545,14 @@ function buildProxyGroups(options = {}) {
       type: 'select',
       icon: 'https://raw.githubusercontent.com/remnawave/templates/refs/heads/main/icons/Discord.png',
       proxies: ['♻️ Сначала РФ', '🌍 Зарубежный сервер', 'Без VPN (напрямую)'],
-      use: ['ru_servers', 'foreign_servers']
+      use: allUse
     },
     {
       name: '🎵 Spotify / SoundCloud',
       type: 'select',
       icon: 'https://cdn.jsdelivr.net/gh/Koolson/Qure@master/IconSet/Color/Spotify.png',
       proxies: ['♻️ Сначала РФ', '🌍 Зарубежный сервер', 'Без VPN (напрямую)'],
-      use: ['ru_servers', 'foreign_servers']
+      use: allUse
     },
     {
       name: '🚫 Заблокированные сайты (RU)',
@@ -444,7 +560,7 @@ function buildProxyGroups(options = {}) {
       hidden: true,
       icon: 'https://raw.githubusercontent.com/remnawave/templates/refs/heads/main/icons/Blocked.png',
       proxies: ['🌍 Зарубежный сервер', 'Без VPN (напрямую)'],
-      use: ['foreign_servers']
+      use: foreignUse
     },
     {
       name: '🔞 18+',
@@ -452,7 +568,7 @@ function buildProxyGroups(options = {}) {
       hidden: true,
       icon: 'https://cdn.jsdelivr.net/gh/Koolson/Qure@master/IconSet/Color/Pornhub.png',
       proxies: ['🌍 Зарубежный сервер', 'Без VPN (напрямую)'],
-      use: ['foreign_servers']
+      use: foreignUse
     },
     {
       name: '📞 WhatsApp',
@@ -460,7 +576,7 @@ function buildProxyGroups(options = {}) {
       hidden: true,
       icon: 'https://cdn.jsdelivr.net/gh/Koolson/Qure@master/IconSet/Color/WhatsApp.png',
       proxies: ['🌍 Зарубежный сервер', 'Без VPN (напрямую)'],
-      use: ['foreign_servers']
+      use: foreignUse
     },
     {
       name: '📸 Instagram & Threads',
@@ -468,7 +584,7 @@ function buildProxyGroups(options = {}) {
       hidden: true,
       icon: 'https://cdn.jsdelivr.net/gh/Koolson/Qure@master/IconSet/Color/Instagram.png',
       proxies: ['🌍 Зарубежный сервер'],
-      use: ['foreign_servers']
+      use: foreignUse
     },
     {
       name: '➤ Telegram',
@@ -476,7 +592,7 @@ function buildProxyGroups(options = {}) {
       hidden: true,
       icon: 'https://cdn.jsdelivr.net/gh/Koolson/Qure@master/IconSet/Color/Telegram.png',
       proxies: ['🌍 Зарубежный сервер', 'Без VPN (напрямую)'],
-      use: ['foreign_servers']
+      use: foreignUse
     },
     {
       name: '🎵 TikTok',
@@ -484,7 +600,7 @@ function buildProxyGroups(options = {}) {
       hidden: true,
       icon: 'https://cdn.jsdelivr.net/gh/Koolson/Qure@master/IconSet/Color/TikTok.png',
       proxies: ['🌍 Зарубежный сервер'],
-      use: ['foreign_servers']
+      use: foreignUse
     },
     {
       name: '🤖 AI (Нейронки)',
@@ -492,7 +608,7 @@ function buildProxyGroups(options = {}) {
       hidden: true,
       icon: 'https://cdn.jsdelivr.net/gh/Koolson/Qure@master/IconSet/Color/Spark.png',
       proxies: ['♻️ Автовыбор', '🌍 Зарубежный сервер'],
-      use: ['foreign_servers']
+      use: foreignUse
     },
     {
       name: '👾 Brawl Stars',
@@ -500,7 +616,7 @@ function buildProxyGroups(options = {}) {
       hidden: true,
       icon: 'https://cdn.jsdelivr.net/gh/Koolson/Qure@master/IconSet/Color/Game.png',
       proxies: ['🌍 Зарубежный сервер'],
-      use: ['foreign_servers']
+      use: foreignUse
     },
     {
       name: '👥 Facebook',
@@ -508,15 +624,15 @@ function buildProxyGroups(options = {}) {
       hidden: true,
       icon: 'https://cdn.jsdelivr.net/gh/Koolson/Qure@master/IconSet/Color/Facebook.png',
       proxies: ['🌍 Зарубежный сервер'],
-      use: ['foreign_servers']
+      use: foreignUse
     },
     {
       name: '🇷🇺 Российские серверы',
       type: 'select',
       hidden: true,
       icon: 'https://cdn.jsdelivr.net/gh/Koolson/Qure@master/IconSet/Color/Russia.png',
-      proxies: ['♻️ Автовыбор РФ'],
-      use: ['ru_servers']
+      proxies: ruProxiesList,
+      use: ruUse
     },
     {
       name: '🎮 Игры (DIRECT)',
@@ -524,14 +640,14 @@ function buildProxyGroups(options = {}) {
       hidden: true,
       icon: 'https://cdn.jsdelivr.net/gh/Koolson/Qure@master/IconSet/Color/Game.png',
       proxies: ['Без VPN (напрямую)', '🌍 Зарубежный сервер'],
-      use: ['foreign_servers']
+      use: foreignUse
     },
     {
       name: '📋 My Rules',
       type: 'select',
       hidden: true,
       proxies: ['🌍 Зарубежный сервер', 'Без VPN (напрямую)'],
-      use: ['foreign_servers']
+      use: foreignUse
     }
   );
 
@@ -906,7 +1022,7 @@ function generateConfig(userName, ruProviderUrl, foreignProviderUrl, excludePack
     dns: buildDns(),
     tun: buildTun(excludePackages, options),
     sniffer: buildSniffer(),
-    'proxy-providers': buildProxyProviders(ruProviderUrl, foreignProviderUrl),
+    'proxy-providers': buildProxyProviders(ruProviderUrl, foreignProviderUrl, options),
     'proxy-groups': buildProxyGroups(options),
     'rule-providers': buildRuleProviders(options),
     rules: buildRules(options)
@@ -1229,8 +1345,8 @@ async function buildAll(overrideArg) {
     const getProtocolRank = p => {
       const type = String(p.type || '').toLowerCase();
       if (type === 'hysteria2' || type === 'hysteria') return 30;
-      if (type === 'wireguard') return 20;
-      if (type === 'vless') return 10;
+      if (type === 'vless') return 20;
+      if (type === 'wireguard') return 10;
       return 0;
     };
 
@@ -1275,13 +1391,38 @@ async function buildAll(overrideArg) {
       continue;
     }
 
+    const foreignMulti = foreignProxies.filter(p => !isAwgProxy(p));
+    const foreignAwg = foreignProxies.filter(isAwgProxy);
+    const ruMulti = ruProxies.filter(p => !isAwgProxy(p));
+    const ruAwg = ruProxies.filter(isAwgProxy);
+
+    const hasForeignAwg = foreignAwg.length > 0 && foreignMulti.length > 0;
+    const hasRuAwg = ruAwg.length > 0 && ruMulti.length > 0;
+
+    const ruToServe = hasRuAwg ? ruMulti : ruProxies;
+    const foreignToServe = hasForeignAwg ? foreignMulti : foreignProxies;
+
     const ruPath = path.join(PROVIDERS_DIR, `${token}_ru.yaml`);
     const foreignPath = path.join(PROVIDERS_DIR, `${token}_foreign.yaml`);
+    const ruAwgPath = path.join(PROVIDERS_DIR, `${token}_ru_awg.yaml`);
+    const foreignAwgPath = path.join(PROVIDERS_DIR, `${token}_foreign_awg.yaml`);
     const configPath = path.join(CONFIGS_DIR, `${token}`);
 
     // Write Providers
-    fs.writeFileSync(ruPath, yaml.dump({ proxies: ruProxies }, { indent: 2, lineWidth: -1 }));
-    fs.writeFileSync(foreignPath, yaml.dump({ proxies: foreignProxies }, { indent: 2, lineWidth: -1 }));
+    fs.writeFileSync(ruPath, yaml.dump({ proxies: ruToServe }, { indent: 2, lineWidth: -1 }));
+    fs.writeFileSync(foreignPath, yaml.dump({ proxies: foreignToServe }, { indent: 2, lineWidth: -1 }));
+
+    if (hasForeignAwg) {
+      fs.writeFileSync(foreignAwgPath, yaml.dump({ proxies: foreignAwg }, { indent: 2, lineWidth: -1 }));
+    } else if (fs.existsSync(foreignAwgPath)) {
+      try { fs.unlinkSync(foreignAwgPath); } catch {}
+    }
+
+    if (hasRuAwg) {
+      fs.writeFileSync(ruAwgPath, yaml.dump({ proxies: ruAwg }, { indent: 2, lineWidth: -1 }));
+    } else if (fs.existsSync(ruAwgPath)) {
+      try { fs.unlinkSync(ruAwgPath); } catch {}
+    }
 
     const isTest = isTestTarget(user, users);
     let isUserExp = false;
@@ -1294,7 +1435,15 @@ async function buildAll(overrideArg) {
     const isIos = isIosUser(userDir);
     const userPackages = isIos ? [] : ruPackages;
     const adblockMode = getAdblockPreference(userDir, isIos);
-    const userOptions = { experimental: isUserExp, ios: isIos, adblock: adblockMode };
+    const userOptions = {
+      experimental: isUserExp,
+      ios: isIos,
+      adblock: adblockMode,
+      hasForeignAwg,
+      hasRuAwg,
+      foreignAwgUrl: hasForeignAwg ? `${BASE_URL}/providers/${token}_foreign_awg.yaml` : null,
+      ruAwgUrl: hasRuAwg ? `${BASE_URL}/providers/${token}_ru_awg.yaml` : null
+    };
 
     // Write Master Config
     const rawMaster = generateConfig(
@@ -1323,7 +1472,15 @@ async function buildAll(overrideArg) {
         `${BASE_URL}/providers/${token}_ru.yaml`,
         `${BASE_URL}/providers/${token}_foreign.yaml`,
         userPackages,
-        { experimental: false, ios: isIos, adblock: adblockMode }
+        {
+          experimental: false,
+          ios: isIos,
+          adblock: adblockMode,
+          hasForeignAwg,
+          hasRuAwg,
+          foreignAwgUrl: hasForeignAwg ? `${BASE_URL}/providers/${token}_foreign_awg.yaml` : null,
+          ruAwgUrl: hasRuAwg ? `${BASE_URL}/providers/${token}_ru_awg.yaml` : null
+        }
       );
       rawStable['profile-name'] = `${process.env.PROFILE_NAME || 'Subscription Manager'} (Stable)`;
       const stableConfig = applyCustomConfig(rawStable, userDir, user);
@@ -1359,6 +1516,7 @@ async function buildAll(overrideArg) {
 }
 
 module.exports = {
+  isAwgProxy,
   buildDns,
   buildTun,
   buildSniffer,

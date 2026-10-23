@@ -70,7 +70,37 @@ async function testProxyGroups() {
 
   const expForeign = expGroups.find(g => g.name === '🌍 Зарубежный сервер');
   assert.ok(expForeign.proxies.includes('⚡ Параллельно'));
-  assert.strictEqual(expForeign.proxies[0], '⚡ Параллельно', 'Balancing must be default in experimental mode');
+  assert.strictEqual(expForeign.proxies[0], '♻️ Автовыбор', 'Fallback must be default in experimental mode');
+  assert.strictEqual(expForeign.proxies[1], '⚡ Параллельно', 'Balancing must be second in experimental mode');
+
+  // Test AWG separation and nested fallback
+  const awgGroups = build.buildProxyGroups({ experimental: true, hasForeignAwg: true, hasRuAwg: true });
+  const foreignAwgGroup = awgGroups.find(g => g.name === 'Amnezia WG 3.1');
+  assert.ok(foreignAwgGroup, 'Amnezia WG 3.1 group must exist when hasForeignAwg: true');
+  assert.strictEqual(foreignAwgGroup.type, 'fallback');
+  assert.strictEqual(foreignAwgGroup.lazy, true);
+  assert.strictEqual(foreignAwgGroup.interval, 1800);
+  assert.deepStrictEqual(foreignAwgGroup.use, ['foreign_awg']);
+
+  const ruAwgGroup = awgGroups.find(g => g.name === 'Amnezia WG 3.1 РФ');
+  assert.ok(ruAwgGroup, 'Amnezia WG 3.1 РФ group must exist when hasRuAwg: true');
+  assert.strictEqual(ruAwgGroup.type, 'fallback');
+  assert.strictEqual(ruAwgGroup.lazy, true);
+  assert.strictEqual(ruAwgGroup.interval, 1800);
+  assert.deepStrictEqual(ruAwgGroup.use, ['ru_awg']);
+
+  const foreignAuto = awgGroups.find(g => g.name === '♻️ Автовыбор');
+  assert.deepStrictEqual(foreignAuto.proxies, ['♻️ Мульти-протокол', 'Amnezia WG 3.1']);
+
+  const ruAuto = awgGroups.find(g => g.name === '♻️ Автовыбор РФ');
+  assert.deepStrictEqual(ruAuto.proxies, ['♻️ Мульти-протокол РФ', 'Amnezia WG 3.1 РФ']);
+
+  const awgLbGroup = awgGroups.find(g => g.name === '⚡ Параллельно');
+  assert.deepStrictEqual(awgLbGroup.use, ['foreign_servers'], 'load-balance must not use AWG');
+
+  const awgForeignSelect = awgGroups.find(g => g.name === '🌍 Зарубежный сервер');
+  assert.deepStrictEqual(awgForeignSelect.proxies, ['♻️ Автовыбор', '⚡ Параллельно', 'Amnezia WG 3.1']);
+  assert.deepStrictEqual(awgForeignSelect.use, ['foreign_servers', 'foreign_awg']);
 
   const aiGroup = stableGroups.find(g => g.name === '🤖 AI (Нейронки)');
   assert.deepStrictEqual(aiGroup.proxies, ['♻️ Автовыбор', '🌍 Зарубежный сервер']);
