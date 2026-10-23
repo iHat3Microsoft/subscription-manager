@@ -619,8 +619,53 @@ rule-provider с `PROCESS-NAME` для Windows/Linux/macOS exe
 - **Идея:** Организация обратного туннеля от клиента к серверу (через SSH remote port forwarding, Tailscale или WebSocket reverse-proxy) для порта `external-controller` (Zashboard). Это позволит серверу подписок отправлять REST API команды прямо в ядро Mihomo пользователя в режиме реального времени.
 
 ### [TODO-13] Шифрование провайдеров через Age (age-secret-key)
-- **Контекст:** В Mihomo v1.19.0+ появилась поддержка `age-secret-key` в `proxy-providers`.
-- **Задача:** Добавить генерацию пар ключей x25519 (`age keygen`) и шифрование YAML-файлов провайдеров в формат ASCII Armor (`-----BEGIN AGE ENCRYPTED FILE-----`). Внедрять как opt-in для пользователей с подтвержденными обновленными версиями клиентов.
+- **Контекст:** В Mihomo v1.19.0+ появилась встроенная поддержка `age-secret-key` в `proxy-providers`.
+- **Подтвержденные тесты:** Протестировано на бинарнике Mihomo Meta v1.19.33: если в мастер-конфиге прописан `age-secret-key: AGE-SECRET-KEY-...`, а файл провайдера на сервере временно отдан **без шифрования (обычный YAML)** — ядро Mihomo НЕ ломается и парсит YAML штатно! Если файл зашифрован — ядро автоматически расшифровывает ASCII Armor в RAM.
+- **Двухэтапный план безопасного внедрения (Rollout Blueprint):**
+  1. **Этап 1 (Раздача ключей без шифрования):**
+     - В `src/build.js` генерировать `age.key` для каждого юзера (`mihomo age keygen` -> сохранять в `data/<user>/age.key` с правами 0600).
+     - В `httpProxyProvider` добавить `provider['age-secret-key'] = ageSecretKey`.
+     - Файлы `public/providers/${token}_foreign.yaml` и `_ru.yaml` оставлять **чистым YAML**, параллельно сохранять локальные бэкапы `${token}_foreign.yaml.bak`.
+     - Все клиенты Mihomo v1.19+ при обновлении заберут ключ себе в локальный конфиг.
+  2. **Этап 2 (Включение шифрования через 7–14 дней):**
+     - Запустить шифрование: `mihomo age encrypt <pubkey> <source.yaml> <target.yaml>`.
+     - Файл на веб-сервере превращается в `-----BEGIN AGE ENCRYPTED FILE-----`.
+     - Обычный пользователь или парсер без ключа видит зашифрованную кашу, а клиент расшифровывает на лету.
+- **Где менять код:**
+  - `src/build.js`: функция `httpProxyProvider` (добавление `age-secret-key`), `getOrCreateAgeKey(userDir)`, вызов `mihomo age encrypt`.
+  - Резервные копии: всегда держать `.bak` файлы незашифрованными на сервере.
+
+### [TODO-14] Подмена имени профиля на уровне Angie для устаревших клиентов
+- **Задача:** Пользователи на старых версиях клиентов (до Mihomo 1.19 / старые Clash Verge) не получают новые фичи. Чтобы не ломать им VPN блоком `reject`, отдавать им конфиг с именем профиля `⚠️ ОБНОВИТЕ ПРИЛОЖЕНИЕ`.
+- **Реализация в конфиге Angie (`/etc/angie/http.d/sub.conf`):**
+  ```nginx
+  map $http_user_agent $is_legacy_clash {
+      default 0;
+      ~*clash\.meta/(v?1\.(1[0-8]|[0-9])\.) 1;
+      ~*clash-verge/(v?1\.[0-3]\.) 1;
+      ~*flclash/(v?0\.[0-7]\.) 1;
+      ~*clash/ 1;
+  }
+
+  map $http_user_agent $sub_name {
+      default "k3k.lol VPN";
+      ~*clash\.meta/(v?1\.(1[0-8]|[0-9])\.) "⚠️ ОБНОВИТЕ ПРИЛОЖЕНИЕ";
+      ~*clash-verge/(v?1\.[0-3]\.) "⚠️ ОБНОВИТЕ ПРИЛОЖЕНИЕ";
+      ~*flclash/(v?0\.[0-7]\.) "⚠️ ОБНОВИТЕ ПРИЛОЖЕНИЕ";
+      ~*clash/ "⚠️ ОБНОВИТЕ ПРИЛОЖЕНИЕ";
+  }
+
+  location ~ ^/configs/ {
+      root /opt/subscription-manager/public;
+      add_header Content-Disposition "attachment; filename=\"$sub_name\"" always;
+      add_header Profile-Title "$sub_name" always;
+
+      # Для клиентов v1.14+, читающих profile-name внутри YAML:
+      sub_filter_types text/yaml text/plain application/x-yaml;
+      sub_filter 'profile-name: "Subscription Manager"' 'profile-name: "$sub_name"';
+      sub_filter_once on;
+  }
+  ```
 
 ---
 

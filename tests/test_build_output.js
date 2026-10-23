@@ -100,7 +100,13 @@ async function testProxyGroups() {
 
   const awgForeignSelect = awgGroups.find(g => g.name === '🌍 Зарубежный сервер');
   assert.deepStrictEqual(awgForeignSelect.proxies, ['♻️ Автовыбор', '⚡ Параллельно', 'Amnezia WG 3.1']);
-  assert.deepStrictEqual(awgForeignSelect.use, ['foreign_servers', 'foreign_awg']);
+  assert.deepStrictEqual(awgForeignSelect.use, ['foreign_servers'], 'Foreign selector must not leak AWG in use');
+
+  const tgGroup = awgGroups.find(g => g.name === '➤ Telegram');
+  assert.deepStrictEqual(tgGroup.use, ['foreign_servers'], 'App selectors must not leak AWG in use');
+
+  const ytGroup = awgGroups.find(g => g.name === '▶️ YouTube');
+  assert.deepStrictEqual(ytGroup.use, ['ru_servers', 'foreign_servers'], 'App selectors must not leak AWG in use');
 
   const aiGroup = stableGroups.find(g => g.name === '🤖 AI (Нейронки)');
   assert.deepStrictEqual(aiGroup.proxies, ['♻️ Автовыбор', '🌍 Зарубежный сервер']);

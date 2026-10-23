@@ -359,10 +359,6 @@ function buildProxyGroups(options = {}) {
   const hasForeignAwg = Boolean(options.hasForeignAwg);
   const hasRuAwg = Boolean(options.hasRuAwg);
 
-  const foreignUse = hasForeignAwg ? ['foreign_servers', 'foreign_awg'] : ['foreign_servers'];
-  const ruUse = hasRuAwg ? ['ru_servers', 'ru_awg'] : ['ru_servers'];
-  const allUse = [...ruUse, ...foreignUse];
-
   const foreignProxies = ['♻️ Автовыбор'];
   if (isExp) {
     foreignProxies.push('⚡ Параллельно');
@@ -511,28 +507,28 @@ function buildProxyGroups(options = {}) {
       type: 'select',
       icon: 'https://cdn.jsdelivr.net/gh/Koolson/Qure@master/IconSet/Color/Global.png',
       proxies: foreignProxies,
-      use: foreignUse
+      use: ['foreign_servers']
     },
     {
       name: '🌐 Остальной трафик',
       type: 'select',
       icon: 'https://cdn.jsdelivr.net/gh/Koolson/Qure@master/IconSet/Color/Auto.png',
       proxies: ['Без VPN (напрямую)', '🌍 Зарубежный сервер'],
-      use: foreignUse
+      use: ['foreign_servers']
     },
     {
       name: '▶️ YouTube',
       type: 'select',
       icon: 'https://cdn.jsdelivr.net/gh/Koolson/Qure@master/IconSet/Color/YouTube.png',
       proxies: ['♻️ Сначала РФ', '🌍 Зарубежный сервер', 'Без VPN (напрямую)'],
-      use: allUse
+      use: ['ru_servers', 'foreign_servers']
     },
     {
       name: '🔎 Google',
       type: 'select',
       icon: 'https://cdn.jsdelivr.net/gh/Koolson/Qure@master/IconSet/Color/Google_Search.png',
       proxies: ['Без VPN (напрямую)', '♻️ Автовыбор', '🌍 Зарубежный сервер'],
-      use: foreignUse
+      use: ['foreign_servers']
     },
     {
       name: '🚫 Реклама',
@@ -545,14 +541,14 @@ function buildProxyGroups(options = {}) {
       type: 'select',
       icon: 'https://raw.githubusercontent.com/remnawave/templates/refs/heads/main/icons/Discord.png',
       proxies: ['♻️ Сначала РФ', '🌍 Зарубежный сервер', 'Без VPN (напрямую)'],
-      use: allUse
+      use: ['ru_servers', 'foreign_servers']
     },
     {
       name: '🎵 Spotify / SoundCloud',
       type: 'select',
       icon: 'https://cdn.jsdelivr.net/gh/Koolson/Qure@master/IconSet/Color/Spotify.png',
       proxies: ['♻️ Сначала РФ', '🌍 Зарубежный сервер', 'Без VPN (напрямую)'],
-      use: allUse
+      use: ['ru_servers', 'foreign_servers']
     },
     {
       name: '🚫 Заблокированные сайты (RU)',
@@ -560,7 +556,7 @@ function buildProxyGroups(options = {}) {
       hidden: true,
       icon: 'https://raw.githubusercontent.com/remnawave/templates/refs/heads/main/icons/Blocked.png',
       proxies: ['🌍 Зарубежный сервер', 'Без VPN (напрямую)'],
-      use: foreignUse
+      use: ['foreign_servers']
     },
     {
       name: '🔞 18+',
@@ -568,7 +564,7 @@ function buildProxyGroups(options = {}) {
       hidden: true,
       icon: 'https://cdn.jsdelivr.net/gh/Koolson/Qure@master/IconSet/Color/Pornhub.png',
       proxies: ['🌍 Зарубежный сервер', 'Без VPN (напрямую)'],
-      use: foreignUse
+      use: ['foreign_servers']
     },
     {
       name: '📞 WhatsApp',
@@ -576,7 +572,7 @@ function buildProxyGroups(options = {}) {
       hidden: true,
       icon: 'https://cdn.jsdelivr.net/gh/Koolson/Qure@master/IconSet/Color/WhatsApp.png',
       proxies: ['🌍 Зарубежный сервер', 'Без VPN (напрямую)'],
-      use: foreignUse
+      use: ['foreign_servers']
     },
     {
       name: '📸 Instagram & Threads',
@@ -584,7 +580,7 @@ function buildProxyGroups(options = {}) {
       hidden: true,
       icon: 'https://cdn.jsdelivr.net/gh/Koolson/Qure@master/IconSet/Color/Instagram.png',
       proxies: ['🌍 Зарубежный сервер'],
-      use: foreignUse
+      use: ['foreign_servers']
     },
     {
       name: '➤ Telegram',
@@ -592,7 +588,7 @@ function buildProxyGroups(options = {}) {
       hidden: true,
       icon: 'https://cdn.jsdelivr.net/gh/Koolson/Qure@master/IconSet/Color/Telegram.png',
       proxies: ['🌍 Зарубежный сервер', 'Без VPN (напрямую)'],
-      use: foreignUse
+      use: ['foreign_servers']
     },
     {
       name: '🎵 TikTok',
@@ -600,7 +596,7 @@ function buildProxyGroups(options = {}) {
       hidden: true,
       icon: 'https://cdn.jsdelivr.net/gh/Koolson/Qure@master/IconSet/Color/TikTok.png',
       proxies: ['🌍 Зарубежный сервер'],
-      use: foreignUse
+      use: ['foreign_servers']
     },
     {
       name: '🤖 AI (Нейронки)',
@@ -608,7 +604,7 @@ function buildProxyGroups(options = {}) {
       hidden: true,
       icon: 'https://cdn.jsdelivr.net/gh/Koolson/Qure@master/IconSet/Color/Spark.png',
       proxies: ['♻️ Автовыбор', '🌍 Зарубежный сервер'],
-      use: foreignUse
+      use: ['foreign_servers']
     },
     {
       name: '👾 Brawl Stars',
@@ -616,7 +612,7 @@ function buildProxyGroups(options = {}) {
       hidden: true,
       icon: 'https://cdn.jsdelivr.net/gh/Koolson/Qure@master/IconSet/Color/Game.png',
       proxies: ['🌍 Зарубежный сервер'],
-      use: foreignUse
+      use: ['foreign_servers']
     },
     {
       name: '👥 Facebook',
@@ -624,7 +620,7 @@ function buildProxyGroups(options = {}) {
       hidden: true,
       icon: 'https://cdn.jsdelivr.net/gh/Koolson/Qure@master/IconSet/Color/Facebook.png',
       proxies: ['🌍 Зарубежный сервер'],
-      use: foreignUse
+      use: ['foreign_servers']
     },
     {
       name: '🇷🇺 Российские серверы',
@@ -632,7 +628,7 @@ function buildProxyGroups(options = {}) {
       hidden: true,
       icon: 'https://cdn.jsdelivr.net/gh/Koolson/Qure@master/IconSet/Color/Russia.png',
       proxies: ruProxiesList,
-      use: ruUse
+      use: ['ru_servers']
     },
     {
       name: '🎮 Игры (DIRECT)',
@@ -640,14 +636,14 @@ function buildProxyGroups(options = {}) {
       hidden: true,
       icon: 'https://cdn.jsdelivr.net/gh/Koolson/Qure@master/IconSet/Color/Game.png',
       proxies: ['Без VPN (напрямую)', '🌍 Зарубежный сервер'],
-      use: foreignUse
+      use: ['foreign_servers']
     },
     {
       name: '📋 My Rules',
       type: 'select',
       hidden: true,
       proxies: ['🌍 Зарубежный сервер', 'Без VPN (напрямую)'],
-      use: foreignUse
+      use: ['foreign_servers']
     }
   );
 
@@ -1326,11 +1322,12 @@ async function buildAll(overrideArg) {
     let ruProxies = await collectProxiesFromDir(ruDir);
     let foreignProxies = await collectProxiesFromDir(foreignDir);
 
-    // Отключаем remote-dns-resolve и убираем 172.x DNS для всех Wireguard нод (RU и foreign),
-    // чтобы туннели не зависали на недоступных докер-DNS и использовали централизованный DNS Mihomo.
+    // Отключаем remote-dns-resolve, persistent-keepalive и убираем 172.x DNS для всех Wireguard нод (RU и foreign),
+    // чтобы туннели не зависали на недоступных докер-DNS, не слали холостые keepalive-пакеты и использовали централизованный DNS Mihomo.
     const sanitizeWireGuard = p => {
       if (p && p.type === 'wireguard') {
         delete p['remote-dns-resolve'];
+        delete p['persistent-keepalive'];
         if (p.dns && Array.isArray(p.dns)) {
           p.dns = p.dns.filter(d => !/^172\.(1[6-9]|2[0-9]|3[0-1])\./.test(d));
           if (p.dns.length === 0) delete p.dns;

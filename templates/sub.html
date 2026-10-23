@@ -463,7 +463,16 @@
             const cleanSubUrl = subUrl.split('#')[0];
 
             const urlParams = new URLSearchParams(window.location.search);
-            const dynamicName = urlParams.get('name') || 'VPN';
+            const hostParts = window.location.hostname.split('.');
+            let dynamicName = 'VPN';
+            if (urlParams.get('name')) {
+                dynamicName = urlParams.get('name');
+            } else if (hostParts.length >= 2) {
+                const baseDomain = hostParts.slice(-2).join('.').toLowerCase();
+                if (baseDomain && baseDomain !== 'localhost') {
+                    dynamicName = baseDomain + ' VPN';
+                }
+            }
 
             document.title = 'Подключение ' + dynamicName;
             document.getElementById('page-title').innerText = 'Подключение ' + dynamicName;
