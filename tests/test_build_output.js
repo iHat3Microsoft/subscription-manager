@@ -107,6 +107,13 @@ async function testProxyGroups() {
 
   const ytGroup = awgGroups.find(g => g.name === '▶️ YouTube');
   assert.deepStrictEqual(ytGroup.use, ['ru_servers', 'foreign_servers'], 'App selectors must not leak AWG in use');
+  assert.ok(ytGroup.proxies.includes('Amnezia WG 3.1 РФ'), 'YouTube must include Russian AWG option');
+
+  const discordGroup = awgGroups.find(g => g.name === '💬 Discord');
+  assert.ok(discordGroup.proxies.includes('Amnezia WG 3.1 РФ'), 'Discord must include Russian AWG option');
+
+  const ruFirstAwgGroup = awgGroups.find(g => g.name === '♻️ Сначала РФ');
+  assert.deepStrictEqual(ruFirstAwgGroup.proxies, ['♻️ Автовыбор РФ', 'Amnezia WG 3.1 РФ', '♻️ Автовыбор']);
 
   const aiGroup = stableGroups.find(g => g.name === '🤖 AI (Нейронки)');
   assert.deepStrictEqual(aiGroup.proxies, ['♻️ Автовыбор', '🌍 Зарубежный сервер']);

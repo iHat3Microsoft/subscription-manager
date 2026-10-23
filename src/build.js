@@ -470,6 +470,12 @@ function buildProxyGroups(options = {}) {
     });
   }
 
+  const ruFallbackProxies = ['♻️ Автовыбор РФ'];
+  if (hasRuAwg) {
+    ruFallbackProxies.push('Amnezia WG 3.1 РФ');
+  }
+  ruFallbackProxies.push('♻️ Автовыбор');
+
   groups.push({
     name: '♻️ Сначала РФ',
     type: 'fallback',
@@ -479,7 +485,7 @@ function buildProxyGroups(options = {}) {
     interval: 120,
     timeout: 5000,
     'max-failed-times': 3,
-    proxies: ['♻️ Автовыбор РФ', '♻️ Автовыбор']
+    proxies: ruFallbackProxies
   });
 
   if (isExp) {
@@ -502,6 +508,12 @@ function buildProxyGroups(options = {}) {
     ruProxiesList.push('Amnezia WG 3.1 РФ');
   }
 
+  const dualTargetProxies = ['♻️ Сначала РФ', '🌍 Зарубежный сервер'];
+  if (hasRuAwg) {
+    dualTargetProxies.push('Amnezia WG 3.1 РФ');
+  }
+  dualTargetProxies.push('Без VPN (напрямую)');
+
   groups.push(
     {
       name: '🌍 Зарубежный сервер',
@@ -521,7 +533,7 @@ function buildProxyGroups(options = {}) {
       name: '▶️ YouTube',
       type: 'select',
       icon: 'https://cdn.jsdelivr.net/gh/Koolson/Qure@master/IconSet/Color/YouTube.png',
-      proxies: ['♻️ Сначала РФ', '🌍 Зарубежный сервер', 'Без VPN (напрямую)'],
+      proxies: [...dualTargetProxies],
       use: ['ru_servers', 'foreign_servers']
     },
     {
@@ -541,14 +553,14 @@ function buildProxyGroups(options = {}) {
       name: '💬 Discord',
       type: 'select',
       icon: 'https://raw.githubusercontent.com/remnawave/templates/refs/heads/main/icons/Discord.png',
-      proxies: ['♻️ Сначала РФ', '🌍 Зарубежный сервер', 'Без VPN (напрямую)'],
+      proxies: [...dualTargetProxies],
       use: ['ru_servers', 'foreign_servers']
     },
     {
       name: '🎵 Spotify / SoundCloud',
       type: 'select',
       icon: 'https://cdn.jsdelivr.net/gh/Koolson/Qure@master/IconSet/Color/Spotify.png',
-      proxies: ['♻️ Сначала РФ', '🌍 Зарубежный сервер', 'Без VPN (напрямую)'],
+      proxies: [...dualTargetProxies],
       use: ['ru_servers', 'foreign_servers']
     },
     {
