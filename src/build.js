@@ -525,6 +525,13 @@ function buildProxyGroups(options = {}) {
       use: ['ru_servers']
     },
     {
+      name: '🇷🇺 Российский трафик',
+      type: 'select',
+      hidden: true,
+      icon: 'https://cdn.jsdelivr.net/gh/Koolson/Qure@master/IconSet/Color/Russia.png',
+      proxies: ['Без VPN (напрямую)', '🇷🇺 Российские серверы']
+    },
+    {
       name: '🎮 Игры (DIRECT)',
       type: 'select',
       hidden: true,
@@ -872,17 +879,17 @@ function buildRules(options = {}) {
     'RULE-SET,ru-bundle,🚫 Заблокированные сайты (RU)',
     'RULE-SET,ru-blocked,🚫 Заблокированные сайты (RU)',
 
-    // 6. Прямой RU-трафик по доменным зонам
-    'DOMAIN-SUFFIX,ru,DIRECT',
-    'DOMAIN-SUFFIX,xn--p1ai,DIRECT',
-    'DOMAIN-SUFFIX,su,DIRECT',
+    // 6. Прямой RU-трафик по доменным зонам (по умолчанию 'Без VPN (напрямую)')
+    'DOMAIN-SUFFIX,ru,🇷🇺 Российский трафик',
+    'DOMAIN-SUFFIX,xn--p1ai,🇷🇺 Российский трафик',
+    'DOMAIN-SUFFIX,su,🇷🇺 Российский трафик',
 
     // 7. IP-правила (в самом низу перед MATCH)
     'RULE-SET,discord_voiceips,💬 Discord,no-resolve',
     'RULE-SET,telegram-ips,➤ Telegram,no-resolve',
     'RULE-SET,facebook-ips,📞 WhatsApp,no-resolve',
     'RULE-SET,google-geoip,🔎 Google,no-resolve',
-    'GEOIP,RU,DIRECT',
+    'GEOIP,RU,🇷🇺 Российский трафик',
     'IP-CIDR,151.101.0.0/16,🚫 Заблокированные сайты (RU)',
     'RULE-SET,rknasnblock,🚫 Заблокированные сайты (RU)',
 

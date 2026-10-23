@@ -93,6 +93,11 @@ async function testProxyGroups() {
   assert.strictEqual(musicGroup.hidden, undefined, 'Spotify / SoundCloud group must be visible');
   assert.deepStrictEqual(musicGroup.proxies, ['♻️ Сначала РФ', '🌍 Зарубежный сервер', 'Без VPN (напрямую)']);
 
+  const abroadGroup = stableGroups.find(g => g.name === '🇷🇺 Российский трафик');
+  assert.ok(abroadGroup, 'Российский трафик must exist');
+  assert.strictEqual(abroadGroup.hidden, true, 'Российский трафик must be hidden by default');
+  assert.deepStrictEqual(abroadGroup.proxies, ['Без VPN (напрямую)', '🇷🇺 Российские серверы']);
+
   console.log('ok - Proxy groups and sticky-sessions load-balance verified');
 }
 
@@ -134,23 +139,23 @@ async function testRules() {
   const myRulesIdx = stableRules.findIndex(r => r.includes('my-rules'));
   const ruBundleIdx = stableRules.findIndex(r => r.includes('ru-bundle'));
   const ruBlockedIdx = stableRules.findIndex(r => r.includes('ru-blocked'));
-  const ruDirectIdx = stableRules.findIndex(r => r === 'DOMAIN-SUFFIX,ru,DIRECT');
-  const xnDirectIdx = stableRules.findIndex(r => r === 'DOMAIN-SUFFIX,xn--p1ai,DIRECT');
+  const ruDirectIdx = stableRules.findIndex(r => r === 'DOMAIN-SUFFIX,ru,🇷🇺 Российский трафик');
+  const xnDirectIdx = stableRules.findIndex(r => r === 'DOMAIN-SUFFIX,xn--p1ai,🇷🇺 Российский трафик');
   const rknAsnIdx = stableRules.findIndex(r => r.includes('rknasnblock'));
   const matchIdx = stableRules.findIndex(r => r.startsWith('MATCH'));
 
   assert.ok(myRulesIdx < stableRules.findIndex(r => r.includes('games-direct')), 'my-rules must be above games-direct');
   assert.ok(myRulesIdx < ruBundleIdx, 'my-rules must be higher priority than ru-bundle');
-  assert.ok(ruBundleIdx < ruDirectIdx, 'ru-bundle must be checked BEFORE DOMAIN-SUFFIX,ru,DIRECT');
-  assert.ok(ruBlockedIdx < ruDirectIdx, 'ru-blocked must be checked BEFORE DOMAIN-SUFFIX,ru,DIRECT');
-  assert.ok(xnDirectIdx > 0, 'DOMAIN-SUFFIX,xn--p1ai,DIRECT must exist');
+  assert.ok(ruBundleIdx < ruDirectIdx, 'ru-bundle must be checked BEFORE DOMAIN-SUFFIX,ru');
+  assert.ok(ruBlockedIdx < ruDirectIdx, 'ru-blocked must be checked BEFORE DOMAIN-SUFFIX,ru');
+  assert.ok(xnDirectIdx > 0, 'DOMAIN-SUFFIX,xn--p1ai must exist');
   assert.strictEqual(stableRules.some(r => r.includes('DOMAIN-SUFFIX,рф')), false, 'Cyrillic .рф must be replaced with punycode');
 
   // IP rules at the bottom
   assert.ok(rknAsnIdx > ruDirectIdx, 'rknasnblock must be below domain rules');
   assert.ok(stableRules.includes('IP-CIDR,151.101.0.0/16,🚫 Заблокированные сайты (RU)'), 'Fastly CDN rule must be present');
   assert.strictEqual(stableRules.find(r => r.includes('rknasnblock')), 'RULE-SET,rknasnblock,🚫 Заблокированные сайты (RU)', 'rknasnblock must resolve unclassified CDN IPs');
-  assert.ok(stableRules.find(r => r.startsWith('GEOIP,RU')).endsWith('no-resolve') || stableRules.find(r => r === 'GEOIP,RU,DIRECT'), 'GEOIP,RU must be near bottom');
+  assert.ok(stableRules.find(r => r.startsWith('GEOIP,RU')).endsWith('no-resolve') || stableRules.find(r => r === 'GEOIP,RU,🇷🇺 Российский трафик'), 'GEOIP,RU must be near bottom');
   assert.strictEqual(matchIdx, stableRules.length - 1, 'MATCH must be the final rule');
   assert.strictEqual(stableRules.some(r => r.includes('IP-ASN')), false, 'IP-ASN must be removed to avoid downloading GeoASN.dat');
 
