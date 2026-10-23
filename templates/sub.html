@@ -10,7 +10,6 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <style>
         :root {
-            /* Палитра Omarchy Matte Black / Nautilus */
             --bg-deepest: #090909;
             --bg-darker: #0d0d0d;
             --bg-main: #121212;
@@ -31,7 +30,6 @@
             --text-muted: #8d939e;
             --text-disabled: #555555;
 
-            /* Насыщенный матовый янтарь / теплое золото */
             --accent-primary: #e58e0a;
             --accent-hover: #f59e0b;
             --accent-bright: #fbbf24;
@@ -41,7 +39,6 @@
             --status-success: #9ece6a;
         }
 
-        /* Полный запрет скруглений и теней: строгий индустриальный квадратный стиль */
         * {
             box-sizing: border-box;
             margin: 0;
@@ -210,7 +207,6 @@
             font-weight: 600;
         }
 
-        /* Platform Tabs */
         .platform-tabs {
             display: flex;
             background: var(--bg-surface);
@@ -240,7 +236,6 @@
             border-color: var(--border-default);
         }
 
-        /* App Downloads */
         .app-list {
             display: flex;
             flex-direction: column;
@@ -308,7 +303,6 @@
             transform: translateX(2px);
         }
 
-        /* Скрываемые дополнительные клиенты (аккордеон) */
         .other-apps-wrapper {
             margin-top: 4px;
             text-align: left;
@@ -378,7 +372,6 @@
             color: var(--text-muted);
         }
 
-        /* Инструкции по шагам */
         .steps {
             text-align: left;
             margin-top: 18px;
@@ -456,17 +449,11 @@
                 <button class="tab-btn" data-target="linux">Linux</button>
             </div>
 
-            <div id="app-container" class="app-list">
-                <!-- Основные приложения платформы -->
-            </div>
+            <div id="app-container" class="app-list"></div>
 
-            <div id="other-apps-container" class="other-apps-wrapper">
-                <!-- Спойлер дополнительных клиентов (если есть) -->
-            </div>
+            <div id="other-apps-container" class="other-apps-wrapper"></div>
 
-            <div class="steps" id="steps-container">
-                <!-- Инструкция меняется динамически под выбранную ОС -->
-            </div>
+            <div class="steps" id="steps-container"></div>
         </div>
     </div>
 
@@ -475,27 +462,15 @@
             const subUrl = window.location.href;
             const cleanSubUrl = subUrl.split('#')[0];
 
-            // Динамическое определение названия сервиса
             const urlParams = new URLSearchParams(window.location.search);
-            const hostParts = window.location.hostname.split('.');
-            let dynamicName = 'VPN';
-            if (urlParams.get('name')) {
-                dynamicName = urlParams.get('name');
-            } else if (hostParts.length >= 2) {
-                const domainBase = hostParts[hostParts.length - 2];
-                if (domainBase && domainBase !== 'localhost') {
-                    dynamicName = domainBase.toUpperCase() + ' VPN';
-                }
-            }
+            const dynamicName = urlParams.get('name') || 'VPN';
 
             document.title = 'Подключение ' + dynamicName;
             document.getElementById('page-title').innerText = 'Подключение ' + dynamicName;
 
-            // Deep-link схема clash://install-config?url=...
             const importBtn = document.getElementById('btn-import');
             importBtn.href = 'clash://install-config?url=' + encodeURIComponent(cleanSubUrl) + '&name=' + encodeURIComponent(dynamicName);
 
-            // Кнопка копирования ссылки
             const copyBtn = document.getElementById('btn-copy');
             copyBtn.addEventListener('click', function() {
                 navigator.clipboard.writeText(cleanSubUrl).then(() => {
@@ -510,7 +485,6 @@
                 });
             });
 
-            // Каталог приложений: основные (сверху) и альтернативные (в аккордеоне)
             const appsData = {
                 android: {
                     main: [
@@ -670,7 +644,6 @@
             function renderPlatform(platform) {
                 const data = appsData[platform] || appsData.android;
                 
-                // Рендер основных клиентов
                 const appContainer = document.getElementById('app-container');
                 appContainer.innerHTML = data.main.map(app => `
                     <a class="app-item" href="${app.url}" target="_blank" rel="noopener">
@@ -687,7 +660,6 @@
                     </a>
                 `).join('');
 
-                // Рендер спойлера альтернативных клиентов
                 const otherContainer = document.getElementById('other-apps-container');
                 if (data.others && data.others.length > 0) {
                     otherContainer.innerHTML = `
@@ -707,7 +679,6 @@
                     otherContainer.innerHTML = '';
                 }
 
-                // Рендер индивидуальной инструкции для выбранной ОС
                 const stepsContainer = document.getElementById('steps-container');
                 stepsContainer.innerHTML = data.steps.map((step, idx) => `
                     <div class="step-item">
@@ -716,7 +687,6 @@
                     </div>
                 `).join('');
 
-                // Переключение активного таба
                 document.querySelectorAll('.tab-btn').forEach(btn => {
                     btn.classList.toggle('active', btn.dataset.target === platform);
                 });
