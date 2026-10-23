@@ -114,6 +114,9 @@ async function testProxyGroups() {
 
   const ruFirstAwgGroup = awgGroups.find(g => g.name === '♻️ Сначала РФ');
   assert.deepStrictEqual(ruFirstAwgGroup.proxies, ['♻️ Автовыбор РФ', 'Amnezia WG 3.1 РФ', '♻️ Автовыбор']);
+  assert.strictEqual(ruFirstAwgGroup['max-failed-times'], 1);
+  assert.strictEqual(ruFirstAwgGroup.timeout, 3000);
+  assert.strictEqual(ruFirstAwgGroup.interval, 180);
 
   const aiGroup = stableGroups.find(g => g.name === '🤖 AI (Нейронки)');
   assert.deepStrictEqual(aiGroup.proxies, ['♻️ Автовыбор', '🌍 Зарубежный сервер']);

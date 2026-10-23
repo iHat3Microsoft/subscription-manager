@@ -378,8 +378,8 @@ function buildProxyGroups(options = {}) {
       lazy: true,
       url: 'https://www.gstatic.com/generate_204',
       interval: 1800,
-      timeout: 5000,
-      'max-failed-times': 3,
+      timeout: 3000,
+      'max-failed-times': 1,
       use: ['foreign_awg']
     });
 
@@ -389,9 +389,9 @@ function buildProxyGroups(options = {}) {
       hidden: true,
       lazy: true,
       url: 'https://www.gstatic.com/generate_204',
-      interval: 120,
-      timeout: 5000,
-      'max-failed-times': 3,
+      interval: 180,
+      timeout: 3000,
+      'max-failed-times': 1,
       use: ['foreign_servers']
     });
 
@@ -401,9 +401,9 @@ function buildProxyGroups(options = {}) {
       hidden: true,
       lazy: true,
       url: 'https://www.gstatic.com/generate_204',
-      interval: 120,
-      timeout: 5000,
-      'max-failed-times': 3,
+      interval: 180,
+      timeout: 3000,
+      'max-failed-times': 1,
       proxies: ['♻️ Мульти-протокол', 'Amnezia WG 3.1']
     });
   } else {
@@ -413,9 +413,9 @@ function buildProxyGroups(options = {}) {
       hidden: true,
       lazy: true,
       url: 'https://www.gstatic.com/generate_204',
-      interval: 120,
-      timeout: 5000,
-      'max-failed-times': 3,
+      interval: 180,
+      timeout: 3000,
+      'max-failed-times': 1,
       use: ['foreign_servers']
     });
   }
@@ -428,8 +428,8 @@ function buildProxyGroups(options = {}) {
       lazy: true,
       url: 'https://www.gstatic.com/generate_204',
       interval: 1800,
-      timeout: 5000,
-      'max-failed-times': 3,
+      timeout: 3000,
+      'max-failed-times': 1,
       use: ['ru_awg']
     });
 
@@ -439,9 +439,9 @@ function buildProxyGroups(options = {}) {
       hidden: true,
       lazy: true,
       url: 'https://www.gstatic.com/generate_204',
-      interval: 120,
-      timeout: 5000,
-      'max-failed-times': 3,
+      interval: 180,
+      timeout: 3000,
+      'max-failed-times': 1,
       use: ['ru_servers']
     });
 
@@ -451,9 +451,9 @@ function buildProxyGroups(options = {}) {
       hidden: true,
       lazy: true,
       url: 'https://www.gstatic.com/generate_204',
-      interval: 120,
-      timeout: 5000,
-      'max-failed-times': 3,
+      interval: 180,
+      timeout: 3000,
+      'max-failed-times': 1,
       proxies: ['♻️ Мульти-протокол РФ', 'Amnezia WG 3.1 РФ']
     });
   } else {
@@ -463,9 +463,9 @@ function buildProxyGroups(options = {}) {
       hidden: true,
       lazy: true,
       url: 'https://www.gstatic.com/generate_204',
-      interval: 120,
-      timeout: 5000,
-      'max-failed-times': 3,
+      interval: 180,
+      timeout: 3000,
+      'max-failed-times': 1,
       use: ['ru_servers']
     });
   }
@@ -482,9 +482,9 @@ function buildProxyGroups(options = {}) {
     hidden: true,
     lazy: true,
     url: 'https://www.gstatic.com/generate_204',
-    interval: 120,
-    timeout: 5000,
-    'max-failed-times': 3,
+    interval: 180,
+    timeout: 3000,
+    'max-failed-times': 1,
     proxies: ruFallbackProxies
   });
 
@@ -496,9 +496,9 @@ function buildProxyGroups(options = {}) {
       hidden: true,
       lazy: true,
       url: 'https://www.gstatic.com/generate_204',
-      interval: 120,
-      timeout: 5000,
-      'max-failed-times': 3,
+      interval: 180,
+      timeout: 3000,
+      'max-failed-times': 1,
       use: ['foreign_servers']
     });
   }
