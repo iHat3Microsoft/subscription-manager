@@ -425,10 +425,10 @@ function buildProxyGroups(options = {}) {
       use: ['foreign_servers']
     },
     {
-      name: '🚫 Реклама',
+      name: 'Реклама',
       type: 'select',
-      icon: 'https://raw.githubusercontent.com/remnawave/templates/refs/heads/main/icons/AdBlock.png',
-      proxies: ['Блокировать', 'Без VPN (напрямую)', '🌍 Зарубежный сервер']
+      icon: 'https://cdn.jsdelivr.net/gh/Koolson/Qure@master/IconSet/Color/Advertising.png',
+      proxies: ['🚫 Блокировать', 'Без VPN (напрямую)', '🌍 Зарубежный сервер']
     },
     {
       name: '💬 Discord',
@@ -823,8 +823,8 @@ function buildRules(options = {}) {
   const isExp = Boolean(options.experimental);
   const isBig = options.adblock === 'big';
   const adblockRule = isBig
-    ? 'RULE-SET,oisd_big,🚫 Реклама'
-    : 'RULE-SET,oisd_small,🚫 Реклама';
+    ? 'RULE-SET,oisd_big,Реклама'
+    : 'RULE-SET,oisd_small,Реклама';
   const rules = [];
 
   if (isExp) {
@@ -913,7 +913,7 @@ function generateConfig(userName, ruProviderUrl, foreignProviderUrl, excludePack
 
     proxies: [
       { name: 'Без VPN (напрямую)', type: 'direct', udp: true },
-      { name: 'Блокировать', type: 'reject' }
+      { name: '🚫 Блокировать', type: 'reject' }
     ],
 
     dns: buildDns(),

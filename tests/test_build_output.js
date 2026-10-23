@@ -80,9 +80,9 @@ async function testProxyGroups() {
   const aiGroup = stableGroups.find(g => g.name === '🤖 AI (Нейронки)');
   assert.deepStrictEqual(aiGroup.proxies, ['♻️ Автовыбор', '🌍 Зарубежный сервер']);
 
-  const adGroup = stableGroups.find(g => g.name === '🚫 Реклама');
+  const adGroup = stableGroups.find(g => g.name === 'Реклама');
   assert.ok(adGroup, 'Adblock group must exist');
-  assert.deepStrictEqual(adGroup.proxies, ['Блокировать', 'Без VPN (напрямую)', '🌍 Зарубежный сервер']);
+  assert.deepStrictEqual(adGroup.proxies, ['🚫 Блокировать', 'Без VPN (напрямую)', '🌍 Зарубежный сервер']);
   assert.strictEqual(adGroup.use, undefined, 'Adblock must not list individual servers in use: [...]');
 
   const googleGroup = stableGroups.find(g => g.name === '🔎 Google');
@@ -127,10 +127,10 @@ async function testRules() {
   const stableRules = build.buildRules({ experimental: false });
   assert.strictEqual(stableRules.some(r => r.startsWith('IP-CIDR6,::/0')), false);
   assert.strictEqual(stableRules.some(r => r.includes('quic')), false);
-  assert.ok(stableRules.includes('RULE-SET,oisd_small,🚫 Реклама'), 'default must use oisd_small');
+  assert.ok(stableRules.includes('RULE-SET,oisd_small,Реклама'), 'default must use oisd_small');
 
   const bigRules = build.buildRules({ adblock: 'big' });
-  assert.ok(bigRules.includes('RULE-SET,oisd_big,🚫 Реклама'), 'adblock: big must use oisd_big');
+  assert.ok(bigRules.includes('RULE-SET,oisd_big,Реклама'), 'adblock: big must use oisd_big');
 
   const expRules = build.buildRules({ experimental: true });
   assert.strictEqual(expRules[0], 'IP-CIDR6,::/0,REJECT-DROP,no-resolve');
@@ -183,7 +183,7 @@ async function testGenerateConfig() {
   assert.strictEqual(stable.tun.stack, undefined);
   assert.ok(Array.isArray(stable.proxies), 'proxies must be an array');
   assert.ok(stable.proxies.some(p => p.name === 'Без VPN (напрямую)' && p.type === 'direct'), 'Без VPN (напрямую) direct proxy must exist');
-  assert.ok(stable.proxies.some(p => p.name === 'Блокировать' && p.type === 'reject'), 'Блокировать reject proxy must exist');
+  assert.ok(stable.proxies.some(p => p.name === '🚫 Блокировать' && p.type === 'reject'), '🚫 Блокировать reject proxy must exist');
 
   const exp = build.generateConfig('User1', 'http://ru', 'http://foreign', [], { experimental: true });
   assert.strictEqual(exp.ipv6, true);
