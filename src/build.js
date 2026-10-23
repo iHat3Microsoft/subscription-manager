@@ -317,13 +317,14 @@ function isAwgProxy(p) {
 
 function httpProxyProvider(url, providerPath, options = {}) {
   const hcInterval = options.healthCheckInterval || 900;
+  const hcEnable = options.healthCheckEnable !== undefined ? options.healthCheckEnable : true;
   return {
     type: 'http',
     interval: options.interval || 3600,
     url,
     path: providerPath,
     'health-check': {
-      enable: true,
+      enable: hcEnable,
       lazy: true,
       interval: hcInterval,
       url: 'https://www.gstatic.com/generate_204'
@@ -340,14 +341,14 @@ function buildProxyProviders(ruProviderUrl, foreignProviderUrl, options = {}) {
   if (options && options.foreignAwgUrl) {
     providers.foreign_awg = httpProxyProvider(options.foreignAwgUrl, './proxy-providers/foreign_awg.yaml', {
       interval: 3600,
-      healthCheckInterval: 1800
+      healthCheckEnable: false
     });
   }
 
   if (options && options.ruAwgUrl) {
     providers.ru_awg = httpProxyProvider(options.ruAwgUrl, './proxy-providers/ru_awg.yaml', {
       interval: 3600,
-      healthCheckInterval: 1800
+      healthCheckEnable: false
     });
   }
 
