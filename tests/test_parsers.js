@@ -57,6 +57,13 @@ async function main() {
   assert.strictEqual(hy2.obfs, 'salamander');
   assert.strictEqual(hy2['obfs-password'], 'ob1');
 
+  const hy2UserPass = await parsers.parseProxyUrl(
+    'hysteria2://alice:pass123@hy.example.com:443?sni=hy.example.com&insecure=1#HY2-User'
+  );
+  assert.strictEqual(hy2UserPass.type, 'hysteria2');
+  assert.strictEqual(hy2UserPass.password, 'alice:pass123');
+  assert.strictEqual(hy2UserPass['skip-cert-verify'], true);
+
   // --- tuic -------------------------------------------------------------------
   const tuic = await parsers.parseProxyUrl(
     'tuic://uuid-here:pass@tu.example.com:443?sni=tu.example.com&congestion_control=bbr&udp_relay_mode=native#TU'

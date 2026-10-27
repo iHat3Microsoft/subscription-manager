@@ -568,7 +568,9 @@ function parseHysteria2(rawUrl) {
     server,
     port
   };
-  const password = decodeURIComponentSafe(u.username);
+  const user = decodeURIComponentSafe(u.username);
+  const pass = decodeURIComponentSafe(u.password);
+  const password = pass ? `${user}:${pass}` : user;
   if (password) proxy.password = password;
   if (p.get('sni')) proxy.sni = p.get('sni');
   if (parseBoolish(p.get('insecure')) || parseBoolish(p.get('allowInsecure'))) proxy['skip-cert-verify'] = true;
