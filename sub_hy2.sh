@@ -72,9 +72,9 @@ while [[ $# -gt 0 ]]; do
         --data-dir)
             DATA_DIR="${2:?missing data dir}"; shift 2 ;;
         --ru)
-            CATEGORY="ru"; shift ;;
+            CATEGORY="ru"; CATEGORY_SET=1; shift ;;
         --category|--dir)
-            CATEGORY="${2:?missing category (foreign or ru)}"; shift 2 ;;
+            CATEGORY="${2:?missing category (foreign or ru)}"; CATEGORY_SET=1; shift 2 ;;
         --name)
             REMOTE_FILENAME="${2:?missing filename}"; shift 2 ;;
         --gen-script)
@@ -116,34 +116,83 @@ while [[ $# -gt 0 ]]; do
     esac
 done
 
-have_tty() { [[ -t 0 ]]; }
+ask() {
+    local var="$1"
+    local prompt="$2"
+    local default_val="${3:-}"
+
+    if [[ -n "${!var:-}" ]]; then
+        return 0
+    fi
+
+    local display_prompt="$prompt"
+    if [[ -n "$default_val" ]]; then
+        display_prompt="$prompt [$default_val]: "
+    else
+        display_prompt="$prompt: "
+    fi
+
+    local reply=""
+    if [[ -t 0 ]]; then
+        read -rp "$display_prompt" reply
+    elif [[ -e /dev/tty ]]; then
+        read -rp "$display_prompt" reply < /dev/tty
+    else
+        reply="$default_val"
+    fi
+
+    if [[ -z "$reply" ]]; then
+        reply="$default_val"
+    fi
+
+    printf -v "$var" '%s' "$reply"
+}
+
+# 1. Interactive questions if parameters not provided via flags
+if [[ -z "${VPN_SERVER:-}" ]]; then
+    KNOWN_HOSTS=$(grep -E '^[[:space:]]*Host[[:space:]]+' ~/.ssh/config 2>/dev/null | awk '{print $2}' | grep -vE '(\*|gitlab|nether)' | paste -sd ', ' - || true)
+    if [[ -n "$KNOWN_HOSTS" ]]; then
+        echo "Found SSH servers in ~/.ssh/config: $KNOWN_HOSTS"
+    fi
+    ask VPN_SERVER "VPN server SSH alias (e.g. sweden, vds)"
+fi
 
 if [[ -z "${VPN_SERVER:-}" ]]; then
-    if have_tty; then
-        read -rp "VPN server SSH alias (e.g. vds or finland): " VPN_SERVER
-    fi
-fi
-
-if [[ -z "${VPN_SERVER:-}" ]]; then
-    usage
+    echo "[!] VPN server alias is required." >&2
+    usage >&2
     exit 1
 fi
 
-if [[ ! -f "$GEN_SCRIPT" ]]; then
-    echo "[!] Generator script not found: $GEN_SCRIPT" >&2
-    exit 1
+ask DOMAIN "Domain for Hysteria (e.g. deb.uvx.lol, or press Enter for server IP / self-signed)" ""
+if [[ -n "$DOMAIN" ]]; then
+    ask EMAIL "Email for Let's Encrypt (optional, press Enter to skip)" ""
 fi
 
+ask HY2_PORT "Hysteria UDP port" "443"
+
+# Default filename suggestion based on server alias:
+DEFAULT_FNAME="${VPN_SERVER}_Hy2.txt"
+case "${VPN_SERVER,,}" in
+    sweden*) DEFAULT_FNAME="Швеция_Hy2.txt" ;;
+    finland*) DEFAULT_FNAME="Финляндия_Hy2.txt" ;;
+    nether*) DEFAULT_FNAME="Нидерланды_Hy2.txt" ;;
+    moscow*|ru*) DEFAULT_FNAME="Москва_Hy2.txt" ;;
+    germany*|de*) DEFAULT_FNAME="Германия_Hy2.txt" ;;
+    vds*) DEFAULT_FNAME="VDS_Hy2.txt" ;;
+esac
+
+ask REMOTE_FILENAME "Display filename in subscription" "$DEFAULT_FNAME"
 if [[ -z "$REMOTE_FILENAME" ]]; then
-    if have_tty; then
-        example_name=$([[ "$CATEGORY" == "ru" ]] && echo "Москва_Hy2.txt" || echo "Нидерланды_Hy2.txt")
-        read -rp "Filename inside every ${CATEGORY}/ folder, example ${example_name}: " REMOTE_FILENAME
-    fi
+    REMOTE_FILENAME="$DEFAULT_FNAME"
 fi
 
-if [[ -z "$REMOTE_FILENAME" ]]; then
-    echo "[!] Empty filename" >&2
-    exit 1
+if [[ -z "${CATEGORY_SET:-}" ]]; then
+    ask CATEGORY_INPUT "Category [1: foreign (default), 2: ru]" "1"
+    if [[ "$CATEGORY_INPUT" == "2" || "$CATEGORY_INPUT" == "ru" ]]; then
+        CATEGORY="ru"
+    else
+        CATEGORY="foreign"
+    fi
 fi
 
 case "$REMOTE_FILENAME" in
@@ -177,18 +226,35 @@ ssh_nether() {
     ssh "${SSH_OPTS[@]}" "$NETHER_HOST" "$@"
 }
 
-echo "[*] VPN server: $VPN_SERVER"
-echo "[*] Subscription host: $NETHER_HOST"
-echo "[*] Data dir: $DATA_DIR"
-echo "[*] Category: $CATEGORY"
-echo "[*] Target filename: $REMOTE_FILENAME"
+echo
+echo "========================================="
+echo " Plan:"
+echo "   VPN Server:    $VPN_SERVER"
+echo "   Domain:        ${DOMAIN:-[None - server IP with self-signed cert]}"
+echo "   Port:          ${HY2_PORT:-443}"
+echo "   Category:      $CATEGORY"
+echo "   Filename:      $REMOTE_FILENAME"
+echo "   Sub Server:    $NETHER_HOST"
+echo "========================================="
 echo
 
-echo "[*] Reading users from $NETHER_HOST..."
+if [[ "$DRY_RUN" -eq 0 && -t 0 ]]; then
+    read -rp "Proceed? [Y/n]: " CONFIRM_RUN
+    if [[ "$CONFIRM_RUN" =~ ^[Nn] ]]; then
+        echo "[*] Aborted by user."
+        exit 0
+    fi
+fi
 
-mapfile -t ALL_USERS < <(
-    ssh_nether "cd $(sq "$DATA_DIR") && find . -mindepth 1 -maxdepth 1 -type d ! -name '.*' -printf '%f\n' | LC_ALL=C sort"
-)
+echo "[*] Reading users from $NETHER_HOST:$DATA_DIR..."
+
+USER_LIST_OUT=$(ssh_nether "cd $(sq "$DATA_DIR") && find . -mindepth 1 -maxdepth 1 -type d ! -name '.*' -printf '%f\n' | LC_ALL=C sort" 2>&1) || {
+    echo "[!] Failed to connect to $NETHER_HOST or read users from $DATA_DIR" >&2
+    echo "    SSH output: $USER_LIST_OUT" >&2
+    exit 1
+}
+
+mapfile -t ALL_USERS < <(printf '%s\n' "$USER_LIST_OUT" | sed '/^$/d')
 
 if [[ "${#ALL_USERS[@]}" -eq 0 ]]; then
     echo "[!] No users found in $NETHER_HOST:$DATA_DIR" >&2
