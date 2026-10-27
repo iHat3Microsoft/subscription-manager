@@ -55,11 +55,13 @@ V="it's a 'quoted' value"
 eval "RT=$(sq "$V")"
 assert_eq "sq round-trips through eval" "$V" "$RT"
 
-# --- sub_hy2.sh & gen_hy2.sh: sq() ------------------------------------------
+# --- sub_hy2.sh & gen_hy2.sh & deploy_hy2.sh: sq() --------------------------
 eval "$(extract_fn sub_hy2.sh sq)"
 assert_eq "sub_hy2.sh sq escapes quote" "'it'\\''s'" "$(sq "it's")"
 eval "$(extract_fn gen_hy2.sh sq)"
 assert_eq "gen_hy2.sh sq escapes quote" "'it'\\''s'" "$(sq "it's")"
+eval "$(extract_fn deploy_hy2.sh sq)"
+assert_eq "deploy_hy2.sh sq escapes quote" "'it'\\''s'" "$(sq "it's")"
 
 if [[ "$FAILS" -eq 0 ]]; then
     echo "shell helpers: all tests passed"
