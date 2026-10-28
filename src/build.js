@@ -287,6 +287,17 @@ function buildSniffer() {
       HTTP: { ports: [80, '8080-8880'], 'override-destination': true },
       TLS: { ports: [443, 8443] }
     },
+    'skip-domain': [
+      'Mijia Cloud',
+      'dlg.io.mi.com',
+      '+.lan',
+      '+.local',
+      '+.push.apple.com',
+      '+.apple.com',
+      '+.msftconnecttest.com',
+      '+.msftncsi.com',
+      '+.3gppnetwork.org'
+    ],
     'skip-dst-address': [
       '0.0.0.0/8',
       '10.0.0.0/8',

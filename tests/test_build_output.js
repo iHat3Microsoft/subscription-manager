@@ -53,7 +53,13 @@ async function testSniffer() {
   assert.strictEqual(sniffer.enable, true);
   assert.strictEqual(sniffer.sniff.QUIC, undefined, 'QUIC sniffing must be removed (no REJECT-QUIC rule)');
   assert.ok(sniffer.sniff.TLS, 'TLS sniffing must be present');
-  console.log('ok - Sniffer verified (no QUIC)');
+  assert.ok(Array.isArray(sniffer['skip-domain']), 'skip-domain must be an array');
+  assert.ok(sniffer['skip-domain'].includes('Mijia Cloud'), 'skip-domain must include Mijia Cloud');
+  assert.ok(sniffer['skip-domain'].includes('+.push.apple.com'), 'skip-domain must include +.push.apple.com');
+  assert.ok(sniffer['skip-domain'].includes('+.apple.com'), 'skip-domain must include +.apple.com');
+  assert.ok(sniffer['skip-domain'].includes('+.3gppnetwork.org'), 'skip-domain must include +.3gppnetwork.org');
+  assert.ok(sniffer['skip-domain'].includes('+.msftconnecttest.com'), 'skip-domain must include +.msftconnecttest.com');
+  console.log('ok - Sniffer verified (no QUIC, skip-domain present)');
 }
 
 async function testProxyGroups() {
