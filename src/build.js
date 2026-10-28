@@ -921,6 +921,8 @@ function generateConfig(userName, ruProviderUrl, foreignProviderUrl, excludePack
     'allow-lan': false,
     'unified-delay': true,
     'tcp-concurrent': true,
+    'keep-alive-idle': 30,
+    'keep-alive-interval': 15,
 
     profile: {
       'store-selected': true

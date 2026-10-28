@@ -187,6 +187,8 @@ async function testGenerateConfig() {
   const stable = build.generateConfig('User1', 'http://ru', 'http://foreign', [], { experimental: false });
   assert.strictEqual(stable.ipv6, false);
   assert.strictEqual(stable.tun.stack, undefined);
+  assert.strictEqual(stable['keep-alive-idle'], 30, 'keep-alive-idle must be 30');
+  assert.strictEqual(stable['keep-alive-interval'], 15, 'keep-alive-interval must be 15');
   assert.ok(stable.profile, 'profile section must exist');
   assert.strictEqual(stable.profile['store-selected'], true, 'profile.store-selected must be true');
   assert.strictEqual(stable.profile['store-fake-ip'], undefined, 'store-fake-ip must NOT be enabled (causes cache desync)');
