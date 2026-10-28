@@ -922,6 +922,10 @@ function generateConfig(userName, ruProviderUrl, foreignProviderUrl, excludePack
     'unified-delay': true,
     'tcp-concurrent': true,
 
+    profile: {
+      'store-selected': true
+    },
+
     proxies: [
       { name: 'Без VPN (напрямую)', type: 'direct', udp: true },
       { name: '🚫 Блокировать', type: 'reject' }

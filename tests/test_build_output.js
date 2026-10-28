@@ -187,6 +187,9 @@ async function testGenerateConfig() {
   const stable = build.generateConfig('User1', 'http://ru', 'http://foreign', [], { experimental: false });
   assert.strictEqual(stable.ipv6, false);
   assert.strictEqual(stable.tun.stack, undefined);
+  assert.ok(stable.profile, 'profile section must exist');
+  assert.strictEqual(stable.profile['store-selected'], true, 'profile.store-selected must be true');
+  assert.strictEqual(stable.profile['store-fake-ip'], undefined, 'store-fake-ip must NOT be enabled (causes cache desync)');
   assert.ok(Array.isArray(stable.proxies), 'proxies must be an array');
   assert.ok(stable.proxies.some(p => p.name === 'Без VPN (напрямую)' && p.type === 'direct'), 'Без VPN (напрямую) direct proxy must exist');
   assert.ok(stable.proxies.some(p => p.name === '🚫 Блокировать' && p.type === 'reject'), '🚫 Блокировать reject proxy must exist');
