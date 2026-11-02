@@ -245,8 +245,13 @@ function buildDns() {
   };
 }
 
+const SYSTEM_EXCLUDE_PACKAGES = [
+  'com.google.android.projection.gearhead' // Android Auto
+];
+
 function buildTun(excludePackages, options = {}) {
   const isExp = Boolean(options.experimental);
+  const isIos = Boolean(options.ios);
   const routeExclude = isExp
     ? [
         '0.0.0.0/8', '10.0.0.0/8', '100.64.0.0/10', '127.0.0.0/8',
@@ -261,6 +266,10 @@ function buildTun(excludePackages, options = {}) {
         '224.0.0.0/3', '::/127', 'fc00::/7', 'fe80::/10', 'ff00::/8'
       ];
 
+  const finalPackages = isIos
+    ? []
+    : [...new Set([...SYSTEM_EXCLUDE_PACKAGES, ...(excludePackages || [])])].sort();
+
   const tun = {
     enable: true,
     'auto-route': true,
@@ -268,7 +277,7 @@ function buildTun(excludePackages, options = {}) {
     'dns-hijack': ['any:53', 'tcp://any:53'],
     'strict-route': true,
     'route-exclude-address': routeExclude,
-    'exclude-package': excludePackages
+    'exclude-package': finalPackages
   };
 
   if (isExp) {

@@ -45,6 +45,10 @@ async function testTun() {
   assert.strictEqual(expTun['route-exclude-address'].includes('ff00::/8'), false);
   assert.ok(expTun['route-exclude-address'].includes('fc00::/7'));
 
+  assert.ok(stableTun['exclude-package'].includes('com.google.android.projection.gearhead'), 'Android Auto must be in exclude-package');
+  const iosTun = build.buildTun(['some.pkg'], { experimental: false, ios: true });
+  assert.strictEqual(iosTun['exclude-package'].length, 0, 'iOS must have empty exclude-package');
+
   console.log('ok - TUN stack omission and IPv6 sinkhole verified');
 }
 
