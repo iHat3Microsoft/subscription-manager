@@ -21,9 +21,14 @@ async function testDns() {
   assert.ok(dns.nameserver.some(ns => ns.includes('1.1.1.1')), 'nameserver must include 1.1.1.1');
   assert.ok(dns.nameserver.some(ns => ns.includes('8.8.8.8')), 'nameserver must include 8.8.8.8');
 
+  assert.ok(dns['fake-ip-filter'].includes('rule-set:geosite-private'), 'fake-ip-filter must include rule-set:geosite-private');
+  assert.ok(dns['fake-ip-filter'].includes('+.lan'), 'fake-ip-filter must include +.lan');
+  assert.ok(dns['fake-ip-filter'].includes('+.local'), 'fake-ip-filter must include +.local');
   assert.ok(dns['fake-ip-filter'].includes('+.msftncsi.com'), 'fake-ip-filter must include msftncsi');
   assert.ok(dns['fake-ip-filter'].includes('+.stun.*'), 'fake-ip-filter must include stun');
+  assert.ok(dns['fake-ip-filter'].includes('+.stun.*.*'), 'fake-ip-filter must include expanded stun');
 
+  assert.deepStrictEqual(dns['nameserver-policy']['rule-set:geosite-private'], ['system'], 'nameserver-policy must include geosite-private -> system');
   assert.ok(dns['nameserver-policy']['geosite:category-ru'], 'nameserver-policy must include geosite:category-ru');
   assert.ok(dns['nameserver-policy']['+.ru'], 'nameserver-policy must include +.ru');
   assert.ok(dns['nameserver-policy']['+.xn--p1ai'], 'nameserver-policy must include +.xn--p1ai');
@@ -125,6 +130,8 @@ async function testRuleProviders() {
   assert.strictEqual(defaultProviders['ru-blocked'].format, 'text');
   assert.strictEqual(defaultProviders['ru-blocked'].path, './rule-sets/ru-blocked.txt');
 
+  assert.strictEqual(defaultProviders['geosite-private'].format, 'mrs');
+  assert.strictEqual(defaultProviders['geosite-private'].path, './rule-sets/geosite-private.mrs');
   assert.strictEqual(defaultProviders['geosite-tiktok'].format, 'mrs');
   assert.strictEqual(defaultProviders['geosite-tiktok'].path, './rule-sets/tiktok.mrs');
   assert.strictEqual(defaultProviders['geosite-soundcloud'].format, 'mrs');

@@ -203,13 +203,18 @@ function buildDns() {
     'enhanced-mode': 'fake-ip',
     'fake-ip-range': '198.18.0.0/15',
     'fake-ip-filter': [
+      'rule-set:geosite-private',
       '*.lan',
       '*.local',
+      '+.lan',
+      '+.local',
       '+.msftconnecttest.com',
       '+.msftncsi.com',
       '+.telegram.org',
       '+.t.me',
-      '+.stun.*'
+      '+.stun.*',
+      '+.stun.*.*',
+      '+.stun.*.*.*'
     ],
     'respect-rules': true,
     'default-nameserver': [
@@ -229,6 +234,7 @@ function buildDns() {
       'https://8.8.8.8/dns-query#🌍 Зарубежный сервер'
     ],
     'nameserver-policy': {
+      'rule-set:geosite-private': ['system'],
       'geosite:category-ru': [
         'https://common.dot.dns.yandex.net/dns-query#disable-ipv6=true',
         '77.88.8.8#disable-ipv6=true'
@@ -597,6 +603,14 @@ function buildRuleProviders(options = {}) {
 
   return {
     ...adblockProvider,
+    'geosite-private': {
+      type: 'http',
+      behavior: 'domain',
+      format: 'mrs',
+      url: 'https://github.com/MetaCubeX/meta-rules-dat/raw/meta/geo/geosite/private.mrs',
+      path: './rule-sets/geosite-private.mrs',
+      interval: 86400
+    },
     discord_voiceips: {
       behavior: 'ipcidr',
       type: 'http',
